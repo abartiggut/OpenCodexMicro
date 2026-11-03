@@ -684,12 +684,25 @@ function handleMessage(raw) {
     const instance = instances.get(contextOf(message)) || addInstance(message);
     instance.active = Boolean(message.active);
     instance.contextPress = null;
+    if (!instance.active) instance.launchActivationHandled = false;
     if (instance.active) {
       instance.lastDisplay = null;
       instance.modelHeld = false;
       instance.modelLayoutReady = false;
       instance.iconLayoutReady = false;
       renderInstance(instance);
+      if (actionName(instance.uuid) === "launch" && !instance.launchActivationHandled) {
+        instance.launchActivationHandled = true;
+        void bridgeSetup.status().then(status => {
+          if (!status.cdpConnected) return handleBridgeSetupMessage({
+            ...instance,
+            payload: { type: "bridgeSetup", action: "start" }
+          });
+        }).catch(error => {
+          send({ cmd: "logMessage", uuid: instance.uuid, actionid: instance.actionid,
+            key: instance.key, level: "error", message: `Codex Bridge auto-start failed: ${error.message}` });
+        });
+      }
     }
     ack(message);
     return;

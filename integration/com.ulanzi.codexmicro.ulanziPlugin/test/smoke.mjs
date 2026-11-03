@@ -181,6 +181,21 @@ try {
   assert.equal(setupStatus?.payload?.status?.cdpConnected, true);
   assert.equal(setupStatus?.payload?.status?.bundledVersion, "0.5.1");
 
+  const launchEvent = {
+    uuid: "com.ulanzi.ulanzistudio.codexmicro.launch",
+    actionid: "launch-on-page-two",
+    key: "2_2",
+    param: {}
+  };
+  client.send(JSON.stringify({ cmd: "add", ...launchEvent }));
+  client.send(JSON.stringify({ cmd: "setactive", ...launchEvent, active: true }));
+  await new Promise(resolve => setTimeout(resolve, 150));
+  assert.ok(messages.some(message => message.cmd === "setactive" &&
+    message.actionid === launchEvent.actionid && message.active === true));
+  assert.ok(!messages.some(message => message.cmd === "logMessage" &&
+    message.actionid === launchEvent.actionid),
+  "An already connected Codex must not be relaunched when its page becomes active");
+
   const taskPaths = [
     "assets/icons/task-working.png",
     "assets/icons/task-complete.png",

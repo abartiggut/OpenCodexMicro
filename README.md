@@ -23,6 +23,8 @@ The Windows setup on a desk, with the D200 showing the same live task keys:
 
 <img src="docs/images/d200-windows-desk.jpg" alt="Ulanzi D200 running the Windows Codex Bridge beside a keyboard and monitor" width="720">
 
+The chat titles on task keys 3 and 4 are anonymized in both photographs.
+
 The task keys use small terminal windows with the current chat title and a
 color-coded, written status. The five states are idle, working, done, input
 needed, and error; offline is shown separately. The matching function icons

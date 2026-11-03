@@ -206,6 +206,23 @@ test("task DOM fallback clicks the thread row instead of nested Pin or Unpin con
   assert.equal(pinClicks, 0, "Pin and Unpin controls must be explicitly rejected");
 });
 
+test("Windows task key waits for sidebar navigation and reports its failure", async () => {
+  const client = new CodexCdpClient();
+  client.platform = "win32";
+  const calls = [];
+  client.dispatchAgent = async (_slot, _threadKey, act) => calls.push(`hid:${act}`);
+  client.activateThread = async () => calls.push("navigate");
+
+  await client.clickThreadKey(`local:${UUID}`, 1);
+  assert.deepEqual(calls, ["hid:1", "hid:0", "navigate"]);
+
+  client.activateThread = async () => { throw new Error("Task is not loaded in the Codex sidebar"); };
+  await assert.rejects(
+    client.clickThreadKey(`local:${UUID}`, 1),
+    /Task is not loaded in the Codex sidebar/
+  );
+});
+
 test("steer renderer action accepts the current localized control", () => {
   let focused = 0;
   let clicks = 0;

@@ -383,6 +383,7 @@ async function discoverDebugPort() {
 }
 
 export class CodexCdpClient {
+  platform = process.platform;
   socket = null;
   nextId = 0;
   pending = new Map();
@@ -484,18 +485,30 @@ export class CodexCdpClient {
   }
 
   async clickThreadKey(threadKey, slot) {
-    // Use the same native HID path as Codex Micro. The DOM click introduced
-    // perceptible navigation scheduling; it is now only a non-blocking fallback.
+    // Use the native HID path first. On Windows the renderer may acknowledge
+    // that event without navigating, so wait for the sidebar fallback too.
+    let dispatched = false;
     try {
       await this.dispatchAgent(slot, threadKey, 1);
+      dispatched = true;
+    } catch {}
+    if (this.platform === "win32") {
+      if (dispatched) {
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        try { await this.dispatchAgent(slot, threadKey, 0); } catch {}
+      }
+      await this.activateThread(threadKey);
+      return;
+    }
+    if (dispatched) {
       void (async () => {
         await new Promise((resolve) => setTimeout(resolve, 35));
         await this.dispatchAgent(slot, threadKey, 0);
         await this.activateThread(threadKey);
       })().catch(() => {});
-    } catch {
-      await this.activateThread(threadKey);
+      return;
     }
+    await this.activateThread(threadKey);
   }
 
   async dispatchAgent(slot, threadKey, act) {

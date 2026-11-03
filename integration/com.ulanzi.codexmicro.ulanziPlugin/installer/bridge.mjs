@@ -4601,6 +4601,7 @@ async function discoverDebugPort() {
   throw new Error("Codex is not running with the local debug bridge");
 }
 var CodexCdpClient = class {
+  platform = process.platform;
   socket = null;
   nextId = 0;
   pending = /* @__PURE__ */ new Map();
@@ -4698,17 +4699,33 @@ var CodexCdpClient = class {
     return this.clickThreadKey(localThreadKey(threadId), slot);
   }
   async clickThreadKey(threadKey, slot) {
+    let dispatched = false;
     try {
       await this.dispatchAgent(slot, threadKey, 1);
+      dispatched = true;
+    } catch {
+    }
+    if (this.platform === "win32") {
+      if (dispatched) {
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        try {
+          await this.dispatchAgent(slot, threadKey, 0);
+        } catch {
+        }
+      }
+      await this.activateThread(threadKey);
+      return;
+    }
+    if (dispatched) {
       void (async () => {
         await new Promise((resolve) => setTimeout(resolve, 35));
         await this.dispatchAgent(slot, threadKey, 0);
         await this.activateThread(threadKey);
       })().catch(() => {
       });
-    } catch {
-      await this.activateThread(threadKey);
+      return;
     }
+    await this.activateThread(threadKey);
   }
   async dispatchAgent(slot, threadKey, act) {
     return this.dispatchMicroMessage({

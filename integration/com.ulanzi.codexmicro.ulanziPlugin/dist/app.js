@@ -5036,7 +5036,7 @@ async function bridgeRequest(path, method = "GET", timeout = 1200) {
 async function openTaskSlot(slot) {
   const task = latestState?.slots?.[slot];
   if (!task?.threadKey) throw new Error(`Codex task slot ${slot + 1} is empty`);
-  await bridgeRequest(`/thread/${encodeURIComponent(task.threadKey)}/click?slot=${slot}`, "POST");
+  await bridgeRequest(`/thread/${encodeURIComponent(task.threadKey)}/click?slot=${slot}`, "POST", 8e3);
 }
 async function pollBridge() {
   if (pollInFlight) return;

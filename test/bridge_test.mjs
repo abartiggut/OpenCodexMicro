@@ -39,12 +39,16 @@ test("decodes one URL path segment and rejects arbitrary ids", () => {
 
 test("named Micro actions preserve press and release phases", async () => {
   const client = new CodexCdpClient();
+  client.platform = "darwin";
   const calls = [];
   client.dispatchAction = async (...args) => calls.push(args);
 
   for (const [action, key] of [
     ["fast", "ACT06"],
+    ["approve", "ACT07"],
+    ["reject", "ACT08"],
     ["fork", "ACT09"],
+    ["mic", "ACT10"],
     ["submit", "ACT12"]
   ]) {
     await client.dispatchNamedAction(action, true);
@@ -63,6 +67,24 @@ test("renderer actions execute once on key down", async () => {
     await client.dispatchNamedAction(action, false);
   }
   assert.deepEqual(calls, ["pin", "new"]);
+});
+
+test("Windows microphone key toggles dictation on press and ignores release", async () => {
+  const client = new CodexCdpClient();
+  client.platform = "win32";
+  const calls = [];
+  client.dispatchMicroMessage = async (message, handler) => calls.push([message.type, handler]);
+
+  await client.dispatchNamedAction("mic", true);
+  await client.dispatchNamedAction("mic", false);
+  await client.dispatchNamedAction("mic", true);
+  await client.dispatchNamedAction("mic", false);
+
+  assert.deepEqual(calls, [
+    ["codex-micro-push-to-talk-start", "codex-micro-push-to-talk-start"],
+    ["codex-micro-push-to-talk-stop", "codex-micro-push-to-talk-stop"]
+  ]);
+  assert.equal(client.microphoneActive, false);
 });
 
 test("new renderer action accepts the current localized New conversation control", () => {
@@ -87,6 +109,25 @@ test("new renderer action accepts the current localized New conversation control
     vm.runInNewContext(rendererActionExpression("new"), { document }),
     true
   );
+  assert.equal(clicks, 1);
+});
+
+test("new renderer action accepts the German New chat control", () => {
+  let clicks = 0;
+  const button = {
+    offsetParent: {},
+    innerText: "",
+    getAttribute(name) { return name === "aria-label" ? "Neuer Chat" : null; },
+    click() { clicks += 1; }
+  };
+  const document = {
+    querySelector() { return null; },
+    querySelectorAll(selector) {
+      assert.equal(selector, "button");
+      return [button];
+    }
+  };
+  assert.equal(vm.runInNewContext(rendererActionExpression("new"), { document }), true);
   assert.equal(clicks, 1);
 });
 
@@ -146,6 +187,25 @@ test("pin renderer action accepts the current localized Pin chat control", () =>
     true
   );
   assert.equal(clicks, 1);
+});
+
+test("pin renderer action accepts German pin and unpin controls", () => {
+  for (const label of ["Chat anpinnen", "Chat nicht mehr anpinnen"]) {
+    let clicks = 0;
+    const button = {
+      offsetParent: {},
+      getAttribute(name) { return name === "aria-label" ? label : null; },
+      click() { clicks += 1; }
+    };
+    const active = { querySelectorAll: () => [button] };
+    const document = {
+      querySelector(selector) {
+        return selector === "[data-app-action-sidebar-thread-active=true]" ? active : null;
+      }
+    };
+    assert.equal(vm.runInNewContext(rendererActionExpression("pin"), { document }), true);
+    assert.equal(clicks, 1);
+  }
 });
 
 test("task DOM fallback clicks the thread row instead of nested Pin or Unpin controls", async () => {

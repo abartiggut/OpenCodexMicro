@@ -37,6 +37,8 @@ const RENDERER_ACTIONS = new Set(["pin", "new"]);
 const PIN_ACTION_LABELS = Object.freeze([
   "Pin chat",
   "Unpin chat",
+  "Chat anpinnen",
+  "Chat nicht mehr anpinnen",
   "置顶聊天",
   "取消置顶聊天",
   "釘選聊天",
@@ -46,6 +48,8 @@ const NEW_ACTION_LABELS = Object.freeze([
   "New task",
   "New chat",
   "New conversation",
+  "Neuer Chat",
+  "Neue Aufgabe",
   "新对话",
   "新對話",
   "新建任务",
@@ -384,6 +388,7 @@ async function discoverDebugPort() {
 
 export class CodexCdpClient {
   platform = process.platform;
+  microphoneActive = false;
   socket = null;
   nextId = 0;
   pending = new Map();
@@ -526,6 +531,19 @@ export class CodexCdpClient {
   }
 
   async dispatchNamedAction(action, pressed) {
+    if (action === "mic" && this.platform === "win32") {
+      if (!pressed) return true;
+      const nextActive = !this.microphoneActive;
+      await this.dispatchMicroMessage({
+        type: nextActive
+          ? "codex-micro-push-to-talk-start"
+          : "codex-micro-push-to-talk-stop"
+      }, nextActive
+        ? "codex-micro-push-to-talk-start"
+        : "codex-micro-push-to-talk-stop");
+      this.microphoneActive = nextActive;
+      return true;
+    }
     const key = MICRO_ACTION_KEYS[action];
     if (key) return this.dispatchAction(key, pressed ? 1 : 0);
     if (!RENDERER_ACTIONS.has(action)) {

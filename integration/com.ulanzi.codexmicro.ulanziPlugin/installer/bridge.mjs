@@ -4259,6 +4259,8 @@ var RENDERER_ACTIONS = /* @__PURE__ */ new Set(["pin", "new"]);
 var PIN_ACTION_LABELS = Object.freeze([
   "Pin chat",
   "Unpin chat",
+  "Chat anpinnen",
+  "Chat nicht mehr anpinnen",
   "\u7F6E\u9876\u804A\u5929",
   "\u53D6\u6D88\u7F6E\u9876\u804A\u5929",
   "\u91D8\u9078\u804A\u5929",
@@ -4268,6 +4270,8 @@ var NEW_ACTION_LABELS = Object.freeze([
   "New task",
   "New chat",
   "New conversation",
+  "Neuer Chat",
+  "Neue Aufgabe",
   "\u65B0\u5BF9\u8BDD",
   "\u65B0\u5C0D\u8A71",
   "\u65B0\u5EFA\u4EFB\u52A1",
@@ -4602,6 +4606,7 @@ async function discoverDebugPort() {
 }
 var CodexCdpClient = class {
   platform = process.platform;
+  microphoneActive = false;
   socket = null;
   nextId = 0;
   pending = /* @__PURE__ */ new Map();
@@ -4740,6 +4745,15 @@ var CodexCdpClient = class {
     }, "codex-micro-hid-event");
   }
   async dispatchNamedAction(action, pressed) {
+    if (action === "mic" && this.platform === "win32") {
+      if (!pressed) return true;
+      const nextActive = !this.microphoneActive;
+      await this.dispatchMicroMessage({
+        type: nextActive ? "codex-micro-push-to-talk-start" : "codex-micro-push-to-talk-stop"
+      }, nextActive ? "codex-micro-push-to-talk-start" : "codex-micro-push-to-talk-stop");
+      this.microphoneActive = nextActive;
+      return true;
+    }
     const key = MICRO_ACTION_KEYS[action];
     if (key) return this.dispatchAction(key, pressed ? 1 : 0);
     if (!RENDERER_ACTIONS.has(action)) {
@@ -4919,7 +4933,10 @@ var composerRevision = 0;
 async function focusCodex() {
   if (process.platform === "win32") {
     const script = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Focus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int n); }'; $p = Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if (-not $p) { exit 1 }; [Focus]::ShowWindowAsync($p.MainWindowHandle, 9) | Out-Null; [Focus]::SetForegroundWindow($p.MainWindowHandle) | Out-Null`;
-    await execFileAsync2("powershell.exe", ["-NoProfile", "-Command", script], { timeout: 5e3 });
+    await execFileAsync2("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], {
+      timeout: 5e3,
+      windowsHide: true
+    });
     return;
   }
   await execFileAsync2("/usr/bin/open", ["-b", "com.openai.codex"], {

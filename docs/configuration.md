@@ -26,8 +26,11 @@ No repository or npm working directory is required for this flow.
 | Permission Pilot (Encoder) | Turn to change permission policy; for a pending approval select ONCE / CHAT / DENY, then press |
 | Fork | Fork the active task |
 | Steer | Send the visible composer text as steering input to a running task |
-| Mic | Press and release the Codex Micro microphone action |
+| Mic | On Windows, press once to start dictation and again to stop; on macOS, use the Codex Micro press/release action |
 | Submit | Submit or queue the composer text |
+
+Steer works only when the active Codex composer exposes a Steer action. Codex's
+Queue action waits for the current turn to finish and is not used as a fallback.
 
 Launch Codex Bridge works even when the Bridge is offline. It reuses the bundled
 installer and its Node selection strategy; no repository or Terminal command is

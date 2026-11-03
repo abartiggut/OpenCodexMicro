@@ -2,8 +2,8 @@
 
 > This repository is an independent abartiggut fork of
 > [UlanziTechnology/OpenCodexMicro](https://github.com/UlanziTechnology/OpenCodexMicro).
-> The original project currently supports macOS. Windows support is under
-> development here. This fork is not maintained or endorsed by Ulanzi or OpenAI.
+> This fork adds experimental Windows support. The original project supports
+> macOS. This fork is not maintained or endorsed by Ulanzi or OpenAI.
 
 **Control Codex Desktop from an Ulanzi D200 Series through Ulanzi Studio.**
 
@@ -32,9 +32,9 @@ Steer, Mic, Submit, Latest Task & Scroll, and Model & Reasoning Encoder actions.
 | Ulanzi Studio integration | Let Ulanzi Studio own the device and manage the key layout |
 | Local-only transport | Bind CDP and the Bridge API to loopback addresses only |
 
-This Ulanzi-maintained project is an unofficial integration with Codex Desktop
-for **macOS, Ulanzi Studio, and Ulanzi D200 Series**. It is not affiliated with or
-endorsed by OpenAI. The entire project was vibe-coded with Codex.
+This independent fork extends Ulanzi's unofficial Codex Desktop integration to
+Windows. The original project targets macOS and Ulanzi D200 Series. Neither
+Ulanzi nor OpenAI maintains or endorses this fork.
 
 Ulanzi's implementation and maintenance scope is limited to
 `integration/com.ulanzi.codexmicro.ulanziPlugin/`. The plugin only consumes
@@ -44,6 +44,31 @@ of CDP or Codex's CDP implementation. See [NOTICE.md](NOTICE.md) for the full
 responsibility boundary.
 
 ## Installation
+
+### Windows 10/11 (experimental)
+
+The Windows port has been installed and its local Bridge and Ulanzi Studio plugin
+have been verified on a D200. A full physical-key test still requires launching
+Codex with the Bridge and assigning actions in Ulanzi Studio.
+
+1. Install Codex Desktop and Ulanzi Studio 3.4.8 or later. Connect the D200.
+2. Install Node.js 20 or later, then open PowerShell in this repository and run:
+
+   ```powershell
+   npm ci
+   npm run setup:windows
+   ```
+
+3. Restart Ulanzi Studio. Add **Codex Micro** actions to the D200 keys.
+4. Close any running Codex app, then press **Launch Codex Bridge** in Ulanzi
+   Studio, or run `%LOCALAPPDATA%\OpenCodexMicro\launch-codex.ps1` in PowerShell.
+5. Check `http://127.0.0.1:17373/health`. `codexConnected` must be `true`.
+
+The Windows launcher never closes an existing Codex session. The Bridge service
+starts with the Ulanzi plugin and uses only local ports 17373 and 9222. See
+[Windows details](docs/setup-and-operations.md#windows-1011-experimental).
+
+### macOS
 
 ### Installation environment
 

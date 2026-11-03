@@ -361,6 +361,14 @@ async function fetchJson(url, timeout = 1200) {
 }
 
 async function discoverDebugPort() {
+  if (process.platform === "win32") {
+    const port = Number(process.env.CODEX_CDP_PORT || 9222);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error("Invalid CODEX_CDP_PORT");
+    }
+    await fetchJson(`http://127.0.0.1:${port}/json/version`, 500);
+    return port;
+  }
   const { stdout } = await execFileAsync("/bin/ps", ["-axo", "command="], { timeout: 4000 });
   for (const line of stdout.split("\n")) {
     if (!line.includes("--remote-debugging-address=127.0.0.1")) continue;

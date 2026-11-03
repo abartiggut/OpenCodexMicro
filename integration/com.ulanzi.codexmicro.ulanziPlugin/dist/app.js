@@ -301,7 +301,7 @@ var require_permessage_deflate = __commonJS({
       acceptAsServer(offers) {
         const opts = this._options;
         const accepted = offers.find((params) => {
-          if (opts.serverNoContextTakeover === false && params.server_no_context_takeover || params.server_max_window_bits && (opts.serverMaxWindowBits === false || typeof opts.serverMaxWindowBits === "number" && opts.serverMaxWindowBits > params.server_max_window_bits) || typeof opts.clientMaxWindowBits === "number" && (typeof params.client_max_window_bits === "number" ? opts.clientMaxWindowBits > params.client_max_window_bits : !params.client_max_window_bits)) {
+          if (opts.serverNoContextTakeover === false && params.server_no_context_takeover || params.server_max_window_bits && (opts.serverMaxWindowBits === false || typeof opts.serverMaxWindowBits === "number" && opts.serverMaxWindowBits > params.server_max_window_bits) || typeof opts.clientMaxWindowBits === "number" && !params.client_max_window_bits) {
             return false;
           }
           return true;
@@ -3706,23 +3706,227 @@ var import_websocket_server = __toESM(require_websocket_server(), 1);
 var wrapper_default = import_websocket.default;
 
 // plugin/app.js
-var import_node_fs2 = require("node:fs");
-var import_node_path2 = require("node:path");
+var import_node_fs3 = require("node:fs");
+var import_node_path3 = require("node:path");
 
 // plugin/bridge-installer.js
-var import_node_fs = require("node:fs");
+var import_node_fs2 = require("node:fs");
+var import_promises2 = require("node:fs/promises");
+var import_node_child_process2 = require("node:child_process");
+var import_node_util2 = require("node:util");
+var import_node_os2 = require("node:os");
+var import_node_path2 = require("node:path");
+
+// plugin/windows-bridge-installer.js
 var import_promises = require("node:fs/promises");
+var import_node_fs = require("node:fs");
 var import_node_child_process = require("node:child_process");
 var import_node_util = require("node:util");
 var import_node_os = require("node:os");
 var import_node_path = require("node:path");
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
+async function exists(path) {
+  try {
+    await (0, import_promises.access)(path, import_node_fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function selectWindowsNodeRuntime({
+  nodeExecutable = process.execPath,
+  environmentPath = process.env.PATH || "",
+  execute = execFileAsync
+} = {}) {
+  const candidates = [
+    ...environmentPath.split(import_node_path.delimiter).filter(Boolean).map((directory) => (0, import_node_path.join)(directory, "node.exe")),
+    nodeExecutable
+  ];
+  for (const candidate of [...new Set(candidates)]) {
+    if (!await exists(candidate)) continue;
+    try {
+      const { stdout = "" } = await execute(candidate, ["--version"]);
+      const match = String(stdout).trim().match(/^v?(\d+)(?:\.(\d+))?/);
+      if (match && Number(match[1]) >= 20) {
+        return {
+          executable: candidate,
+          version: String(stdout).trim().replace(/^v/, ""),
+          source: candidate === nodeExecutable ? "ulanzi" : "system"
+        };
+      }
+    } catch {
+    }
+  }
+  throw new Error("Node.js 20 or later is required for Codex Bridge.");
+}
+function windowsLauncher() {
+  return `$ErrorActionPreference = 'Stop'
+$debugUrl = 'http://127.0.0.1:9222/json/list'
+function Test-CodexDebugEndpoint {
+  try {
+    $targets = @(Invoke-RestMethod -Uri $debugUrl -TimeoutSec 1)
+    if (-not ($targets | Where-Object { $_.type -eq 'page' -and $_.url -like 'app://*' })) { return $false }
+    $listeners = @(Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction Stop)
+    if (-not $listeners -or ($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') })) { return $false }
+    foreach ($listenerPid in @($listeners | Select-Object -ExpandProperty OwningProcess -Unique)) {
+      $owner = Get-CimInstance Win32_Process -Filter "ProcessId = $listenerPid"
+      if ($owner.ExecutablePath -notlike '*\\OpenAI.Codex_*\\app\\ChatGPT.exe') { return $false }
+    }
+    return $true
+  } catch { return $false }
+}
+if (Test-CodexDebugEndpoint) { exit 0 }
+
+$running = Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" |
+  Where-Object { $_.ExecutablePath -like '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' -and $_.CommandLine -notmatch '--type=' }
+if ($running) {
+  throw 'Codex is already running without the Bridge. Close Codex, then launch it from Ulanzi Studio.'
+}
+
+$package = Get-AppxPackage -Name OpenAI.Codex | Sort-Object Version -Descending | Select-Object -First 1
+if (-not $package) { throw 'The Codex desktop app is not installed.' }
+$codex = Join-Path $package.InstallLocation 'app\\ChatGPT.exe'
+if (-not (Test-Path -LiteralPath $codex)) { throw "Codex executable is missing: $codex" }
+Start-Process -FilePath $codex -ArgumentList @(
+  '--remote-debugging-address=127.0.0.1',
+  '--remote-debugging-port=9222',
+  '--remote-allow-origins=http://127.0.0.1:9222'
+)
+for ($attempt = 0; $attempt -lt 150; $attempt++) {
+  Start-Sleep -Milliseconds 200
+  try {
+    if (Test-CodexDebugEndpoint) { exit 0 }
+  } catch {}
+}
+throw 'Codex started, but its local debug endpoint did not become available.'
+`;
+}
+function createWindowsBridgeInstaller({
+  pluginRoot,
+  bridgeUrl,
+  version,
+  home = (0, import_node_os.homedir)(),
+  localAppData = process.env.LOCALAPPDATA || (0, import_node_path.join)(home, "AppData", "Local"),
+  nodeExecutable = process.execPath,
+  environmentPath = process.env.PATH || "",
+  execute = execFileAsync,
+  spawnProcess = import_node_child_process.spawn
+}) {
+  const appRoot = (0, import_node_path.join)(localAppData, "OpenCodexMicro");
+  const bridgeRuntime = (0, import_node_path.join)(appRoot, "bridge.mjs");
+  const launcher = (0, import_node_path.join)(appRoot, "launch-codex.ps1");
+  const metadataPath = (0, import_node_path.join)(appRoot, "install.json");
+  const bundledRuntime = (0, import_node_path.resolve)(pluginRoot, "installer", "bridge.mjs");
+  async function probeBridge() {
+    try {
+      const response = await fetch(`${bridgeUrl}/health`, { signal: AbortSignal.timeout(1200) });
+      const body = await response.json();
+      if (!response.ok || body.service !== "OpenCodexMicro") throw new Error("Unexpected Bridge service");
+      return { serviceOnline: true, cdpConnected: Boolean(body.codexConnected), serviceError: null, pid: body.pid };
+    } catch (error) {
+      return { serviceOnline: false, cdpConnected: false, serviceError: error.message, pid: null };
+    }
+  }
+  async function status() {
+    let metadata = null;
+    try {
+      metadata = JSON.parse(await (0, import_promises.readFile)(metadataPath, "utf8"));
+    } catch {
+    }
+    const [runtimeInstalled, launcherInstalled, probe] = await Promise.all([
+      exists(bridgeRuntime),
+      exists(launcher),
+      probeBridge()
+    ]);
+    const installed = runtimeInstalled && launcherInstalled;
+    return {
+      supported: true,
+      installed,
+      appInstalled: launcherInstalled,
+      serviceInstalled: runtimeInstalled,
+      installedVersion: metadata?.version || null,
+      bundledVersion: version,
+      needsUpdate: !installed || metadata?.version !== version,
+      appPath: launcher,
+      nodeExecutable: metadata?.nodeExecutable || null,
+      nodeVersion: metadata?.nodeVersion || null,
+      nodeSource: metadata?.nodeSource || null,
+      ...probe
+    };
+  }
+  async function ensureService() {
+    if (!await exists(bridgeRuntime)) return status();
+    const probe = await probeBridge();
+    if (probe.serviceOnline) return status();
+    let metadata;
+    try {
+      metadata = JSON.parse(await (0, import_promises.readFile)(metadataPath, "utf8"));
+    } catch {
+    }
+    const runtime = metadata?.nodeExecutable;
+    if (!runtime || !await exists(runtime)) throw new Error("Bridge Node runtime is missing. Repair the installation.");
+    const child = spawnProcess(runtime, [bridgeRuntime], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      cwd: appRoot
+    });
+    child.unref();
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise((resolve4) => setTimeout(resolve4, 100));
+      if ((await probeBridge()).serviceOnline) return status();
+    }
+    throw new Error("Codex Bridge did not start.");
+  }
+  async function install() {
+    if (!await exists(bundledRuntime)) throw new Error("Bundled Bridge runtime is missing.");
+    const runtime = await selectWindowsNodeRuntime({ nodeExecutable, environmentPath, execute });
+    await (0, import_promises.mkdir)(appRoot, { recursive: true });
+    await (0, import_promises.copyFile)(bundledRuntime, bridgeRuntime);
+    await (0, import_promises.writeFile)(launcher, windowsLauncher());
+    for (const notice of ["LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md"]) {
+      await (0, import_promises.copyFile)((0, import_node_path.resolve)(pluginRoot, "installer", notice), (0, import_node_path.join)(appRoot, notice));
+    }
+    await (0, import_promises.writeFile)(metadataPath, `${JSON.stringify({
+      version,
+      nodeExecutable: runtime.executable,
+      nodeVersion: runtime.version,
+      nodeSource: runtime.source,
+      installedAt: (/* @__PURE__ */ new Date()).toISOString()
+    }, null, 2)}
+`);
+    await ensureService();
+    return status();
+  }
+  async function launch() {
+    if (!await exists(launcher)) throw new Error("Codex Bridge is not installed.");
+    await ensureService();
+    await execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launcher]);
+    return status();
+  }
+  async function start() {
+    if (!(await status()).installed) await install();
+    return launch();
+  }
+  async function uninstall() {
+    const probe = await probeBridge();
+    if (probe.serviceOnline && Number.isInteger(probe.pid)) {
+      await execute("taskkill.exe", ["/PID", String(probe.pid), "/F"]);
+    }
+    await (0, import_promises.rm)(appRoot, { recursive: true, force: true });
+    return status();
+  }
+  return { status, install, launch, start, uninstall, ensureService };
+}
+
+// plugin/bridge-installer.js
+var execFileAsync2 = (0, import_node_util2.promisify)(import_node_child_process2.execFile);
 function xml(value) {
   return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
 }
-async function exists(path, mode = import_node_fs.constants.F_OK) {
+async function exists2(path, mode = import_node_fs2.constants.F_OK) {
   try {
-    await (0, import_promises.access)(path, mode);
+    await (0, import_promises2.access)(path, mode);
     return true;
   } catch {
     return false;
@@ -3730,7 +3934,7 @@ async function exists(path, mode = import_node_fs.constants.F_OK) {
 }
 async function readJson(path) {
   try {
-    return JSON.parse(await (0, import_promises.readFile)(path, "utf8"));
+    return JSON.parse(await (0, import_promises2.readFile)(path, "utf8"));
   } catch {
     return null;
   }
@@ -3746,46 +3950,46 @@ async function nodeVersion(executable, execute) {
   }
 }
 async function selectBridgeNodeRuntime({
-  home = (0, import_node_os.homedir)(),
+  home = (0, import_node_os2.homedir)(),
   fallbackNodeExecutable = process.execPath,
   environmentPath = process.env.PATH || "",
   platform = process.platform,
-  execute = execFileAsync
+  execute = execFileAsync2
 } = {}) {
   const candidates = [];
-  if (platform === "darwin" && await exists("/bin/zsh", import_node_fs.constants.X_OK)) {
+  if (platform === "darwin" && await exists2("/bin/zsh", import_node_fs2.constants.X_OK)) {
     try {
       const { stdout = "" } = await execute("/bin/zsh", ["-lic", "node -p process.execPath"]);
       const discovered = String(stdout).split(/\r?\n/).map((line) => line.trim()).find((line) => line.startsWith("/") && line.split("/").at(-1) === "node");
-      if (discovered) candidates.push(await (0, import_promises.realpath)(discovered));
+      if (discovered) candidates.push(await (0, import_promises2.realpath)(discovered));
     } catch {
     }
   }
-  for (const directory of environmentPath.split(import_node_path.delimiter).filter(Boolean)) {
-    candidates.push((0, import_node_path.join)(directory, "node"));
+  for (const directory of environmentPath.split(import_node_path2.delimiter).filter(Boolean)) {
+    candidates.push((0, import_node_path2.join)(directory, "node"));
   }
   candidates.push(
     "/opt/homebrew/bin/node",
     "/usr/local/bin/node",
     "/usr/bin/node",
-    (0, import_node_path.join)(home, ".local", "bin", "node")
+    (0, import_node_path2.join)(home, ".local", "bin", "node")
   );
   let resolvedFallback = fallbackNodeExecutable;
   try {
-    resolvedFallback = await (0, import_promises.realpath)(fallbackNodeExecutable);
+    resolvedFallback = await (0, import_promises2.realpath)(fallbackNodeExecutable);
   } catch {
   }
   for (const executable of [...new Set(candidates)]) {
-    if (!executable.startsWith("/")) continue;
-    if (!await exists(executable, import_node_fs.constants.X_OK)) continue;
-    const resolvedExecutable = await (0, import_promises.realpath)(executable);
+    if (!(0, import_node_path2.isAbsolute)(executable)) continue;
+    if (!await exists2(executable, import_node_fs2.constants.X_OK)) continue;
+    const resolvedExecutable = await (0, import_promises2.realpath)(executable);
     if (resolvedExecutable === resolvedFallback) continue;
     const version = await nodeVersion(resolvedExecutable, execute);
     if (version?.major >= 20) {
       return { executable: resolvedExecutable, version: version.text, source: "system" };
     }
   }
-  if (await exists(resolvedFallback, import_node_fs.constants.X_OK)) {
+  if (await exists2(resolvedFallback, import_node_fs2.constants.X_OK)) {
     const version = await nodeVersion(resolvedFallback, execute);
     if (version?.major >= 20) {
       return { executable: resolvedFallback, version: version.text, source: "ulanzi" };
@@ -3797,29 +4001,40 @@ function createBridgeInstaller({
   pluginRoot,
   bridgeUrl,
   version,
-  home = (0, import_node_os.homedir)(),
+  home = (0, import_node_os2.homedir)(),
   uid = process.getuid?.(),
   platform = process.platform,
   nodeExecutable = process.execPath,
   environmentPath = process.env.PATH || "",
-  execute = execFileAsync
+  execute = execFileAsync2
 }) {
-  const appRoot = (0, import_node_path.join)(home, "Library", "Application Support", "OpenCodexMicro");
-  const userApplications = (0, import_node_path.join)(home, "Applications");
-  const bridgeApp = (0, import_node_path.join)(userApplications, "Codex Bridge.app");
-  const bridgeContents = (0, import_node_path.join)(bridgeApp, "Contents");
-  const bridgeMacOS = (0, import_node_path.join)(bridgeContents, "MacOS");
-  const bridgeResources = (0, import_node_path.join)(bridgeContents, "Resources");
-  const bridgeLicenses = (0, import_node_path.join)(bridgeResources, "licenses");
-  const bridgeExecutable = (0, import_node_path.join)(bridgeMacOS, "Codex Bridge");
-  const bridgeIcon = (0, import_node_path.join)(bridgeResources, "CodexBridge.icns");
-  const bridgeRuntime = (0, import_node_path.join)(appRoot, "bridge.mjs");
-  const installMetadata = (0, import_node_path.join)(appRoot, "install.json");
-  const agentsRoot = (0, import_node_path.join)(home, "Library", "LaunchAgents");
-  const bridgeAgent = (0, import_node_path.join)(agentsRoot, "io.opencodexmicro.bridge.plist");
-  const installerRoot = (0, import_node_path.resolve)(pluginRoot, "installer");
-  const bundledRuntime = (0, import_node_path.join)(installerRoot, "bridge.mjs");
-  const bundledIcon = (0, import_node_path.join)(installerRoot, "CodexBridge.png");
+  if (platform === "win32") {
+    return createWindowsBridgeInstaller({
+      pluginRoot,
+      bridgeUrl,
+      version,
+      home,
+      nodeExecutable,
+      environmentPath,
+      execute
+    });
+  }
+  const appRoot = (0, import_node_path2.join)(home, "Library", "Application Support", "OpenCodexMicro");
+  const userApplications = (0, import_node_path2.join)(home, "Applications");
+  const bridgeApp = (0, import_node_path2.join)(userApplications, "Codex Bridge.app");
+  const bridgeContents = (0, import_node_path2.join)(bridgeApp, "Contents");
+  const bridgeMacOS = (0, import_node_path2.join)(bridgeContents, "MacOS");
+  const bridgeResources = (0, import_node_path2.join)(bridgeContents, "Resources");
+  const bridgeLicenses = (0, import_node_path2.join)(bridgeResources, "licenses");
+  const bridgeExecutable = (0, import_node_path2.join)(bridgeMacOS, "Codex Bridge");
+  const bridgeIcon = (0, import_node_path2.join)(bridgeResources, "CodexBridge.icns");
+  const bridgeRuntime = (0, import_node_path2.join)(appRoot, "bridge.mjs");
+  const installMetadata = (0, import_node_path2.join)(appRoot, "install.json");
+  const agentsRoot = (0, import_node_path2.join)(home, "Library", "LaunchAgents");
+  const bridgeAgent = (0, import_node_path2.join)(agentsRoot, "io.opencodexmicro.bridge.plist");
+  const installerRoot = (0, import_node_path2.resolve)(pluginRoot, "installer");
+  const bundledRuntime = (0, import_node_path2.join)(installerRoot, "bridge.mjs");
+  const bundledIcon = (0, import_node_path2.join)(installerRoot, "CodexBridge.png");
   async function probeBridge() {
     try {
       const response = await fetch(`${bridgeUrl}/health`, {
@@ -3834,9 +4049,9 @@ function createBridgeInstaller({
   }
   async function status() {
     const [appInstalled, runtimeInstalled, agentInstalled, metadata, probe] = await Promise.all([
-      exists(bridgeExecutable, import_node_fs.constants.X_OK),
-      exists(bridgeRuntime),
-      exists(bridgeAgent),
+      exists2(bridgeExecutable, import_node_fs2.constants.X_OK),
+      exists2(bridgeRuntime),
+      exists2(bridgeAgent),
       readJson(installMetadata),
       probeBridge()
     ]);
@@ -3857,9 +4072,9 @@ function createBridgeInstaller({
     };
   }
   async function buildIcon() {
-    const iconset = (0, import_node_path.join)(appRoot, "CodexBridge.iconset");
-    await (0, import_promises.rm)(iconset, { recursive: true, force: true });
-    await (0, import_promises.mkdir)(iconset, { recursive: true });
+    const iconset = (0, import_node_path2.join)(appRoot, "CodexBridge.iconset");
+    await (0, import_promises2.rm)(iconset, { recursive: true, force: true });
+    await (0, import_promises2.mkdir)(iconset, { recursive: true });
     try {
       for (const [name, size] of [
         ["icon_16x16.png", 16],
@@ -3879,19 +4094,19 @@ function createBridgeInstaller({
           String(size),
           bundledIcon,
           "--out",
-          (0, import_node_path.join)(iconset, name)
+          (0, import_node_path2.join)(iconset, name)
         ]);
       }
       await execute("/usr/bin/iconutil", ["-c", "icns", iconset, "-o", bridgeIcon]);
     } finally {
-      await (0, import_promises.rm)(iconset, { recursive: true, force: true });
+      await (0, import_promises2.rm)(iconset, { recursive: true, force: true });
     }
   }
   async function install() {
     if (platform !== "darwin" || !Number.isInteger(uid)) {
       throw new Error("Codex Bridge installation is supported on macOS only.");
     }
-    if (!await exists(bundledRuntime) || !await exists(bundledIcon)) {
+    if (!await exists2(bundledRuntime) || !await exists2(bundledIcon)) {
       throw new Error("The plugin does not contain the Codex Bridge installation resources.");
     }
     const nodeRuntime = await selectBridgeNodeRuntime({
@@ -3901,18 +4116,18 @@ function createBridgeInstaller({
       platform,
       execute
     });
-    await (0, import_promises.mkdir)(appRoot, { recursive: true, mode: 448 });
-    await (0, import_promises.chmod)(appRoot, 448);
-    await (0, import_promises.mkdir)(userApplications, { recursive: true });
-    await (0, import_promises.mkdir)(agentsRoot, { recursive: true });
-    await (0, import_promises.copyFile)(bundledRuntime, bridgeRuntime);
-    await (0, import_promises.rm)(bridgeApp, { recursive: true, force: true });
-    await (0, import_promises.mkdir)(bridgeMacOS, { recursive: true });
-    await (0, import_promises.mkdir)(bridgeLicenses, { recursive: true });
+    await (0, import_promises2.mkdir)(appRoot, { recursive: true, mode: 448 });
+    await (0, import_promises2.chmod)(appRoot, 448);
+    await (0, import_promises2.mkdir)(userApplications, { recursive: true });
+    await (0, import_promises2.mkdir)(agentsRoot, { recursive: true });
+    await (0, import_promises2.copyFile)(bundledRuntime, bridgeRuntime);
+    await (0, import_promises2.rm)(bridgeApp, { recursive: true, force: true });
+    await (0, import_promises2.mkdir)(bridgeMacOS, { recursive: true });
+    await (0, import_promises2.mkdir)(bridgeLicenses, { recursive: true });
     for (const notice of ["LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md"]) {
-      const source = (0, import_node_path.join)(installerRoot, notice);
-      await (0, import_promises.copyFile)(source, (0, import_node_path.join)(bridgeLicenses, notice));
-      await (0, import_promises.copyFile)(source, (0, import_node_path.join)(appRoot, notice));
+      const source = (0, import_node_path2.join)(installerRoot, notice);
+      await (0, import_promises2.copyFile)(source, (0, import_node_path2.join)(bridgeLicenses, notice));
+      await (0, import_promises2.copyFile)(source, (0, import_node_path2.join)(appRoot, notice));
     }
     await buildIcon();
     const info = `<?xml version="1.0" encoding="UTF-8"?>
@@ -3931,7 +4146,7 @@ function createBridgeInstaller({
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 `;
-    await (0, import_promises.writeFile)((0, import_node_path.join)(bridgeContents, "Info.plist"), info);
+    await (0, import_promises2.writeFile)((0, import_node_path2.join)(bridgeContents, "Info.plist"), info);
     const launcher = `#!/bin/zsh
 set -u
 unsetopt BG_NICE
@@ -3977,8 +4192,8 @@ done
 /usr/bin/osascript -e 'display alert "Codex Bridge" message "Codex started, but the bridge endpoint is unavailable. Quit Codex and launch Codex Bridge again." as critical'
 exit 1
 `;
-    await (0, import_promises.writeFile)(bridgeExecutable, launcher, { mode: 493 });
-    await (0, import_promises.chmod)(bridgeExecutable, 493);
+    await (0, import_promises2.writeFile)(bridgeExecutable, launcher, { mode: 493 });
+    await (0, import_promises2.chmod)(bridgeExecutable, 493);
     await execute("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", bridgeApp]);
     const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -3992,12 +4207,12 @@ exit 1
   <key>KeepAlive</key><true/>
   <key>ProcessType</key><string>Background</string>
   <key>ThrottleInterval</key><integer>2</integer>
-  <key>StandardOutPath</key><string>${xml((0, import_node_path.join)(appRoot, "bridge.log"))}</string>
-  <key>StandardErrorPath</key><string>${xml((0, import_node_path.join)(appRoot, "bridge-error.log"))}</string>
+  <key>StandardOutPath</key><string>${xml((0, import_node_path2.join)(appRoot, "bridge.log"))}</string>
+  <key>StandardErrorPath</key><string>${xml((0, import_node_path2.join)(appRoot, "bridge-error.log"))}</string>
 </dict></plist>
 `;
-    await (0, import_promises.writeFile)(bridgeAgent, plist, { mode: 420 });
-    await (0, import_promises.writeFile)(installMetadata, `${JSON.stringify({
+    await (0, import_promises2.writeFile)(bridgeAgent, plist, { mode: 420 });
+    await (0, import_promises2.writeFile)(installMetadata, `${JSON.stringify({
       version,
       nodeExecutable: nodeRuntime.executable,
       nodeVersion: nodeRuntime.version,
@@ -4013,7 +4228,7 @@ exit 1
     return status();
   }
   async function launch() {
-    if (!await exists(bridgeExecutable, import_node_fs.constants.X_OK)) {
+    if (!await exists2(bridgeExecutable, import_node_fs2.constants.X_OK)) {
       throw new Error("Codex Bridge.app is not installed.");
     }
     await execute("/usr/bin/open", [bridgeApp]);
@@ -4033,9 +4248,9 @@ exit 1
       await execute("/bin/launchctl", ["bootout", `gui/${uid}`, bridgeAgent]);
     } catch {
     }
-    await (0, import_promises.rm)(bridgeAgent, { force: true });
-    await (0, import_promises.rm)(appRoot, { recursive: true, force: true });
-    await (0, import_promises.rm)(bridgeApp, { recursive: true, force: true });
+    await (0, import_promises2.rm)(bridgeAgent, { force: true });
+    await (0, import_promises2.rm)(appRoot, { recursive: true, force: true });
+    await (0, import_promises2.rm)(bridgeApp, { recursive: true, force: true });
     return status();
   }
   return { status, install, launch, start, uninstall };
@@ -4316,17 +4531,17 @@ var BRIDGE_URL = process.env.CODEX_BRIDGE_URL || "http://127.0.0.1:17373";
 var [address = "127.0.0.1", port = "3906", language = "en-US"] = process.argv.slice(2);
 var HOST_URL = `ws://${address}:${port}`;
 var instances = /* @__PURE__ */ new Map();
-var PLUGIN_ROOT = (0, import_node_path2.resolve)((0, import_node_path2.dirname)((0, import_node_path2.resolve)(process.argv[1])), "..");
-var MANIFEST = JSON.parse((0, import_node_fs2.readFileSync)((0, import_node_path2.resolve)(PLUGIN_ROOT, "manifest.json"), "utf8"));
+var PLUGIN_ROOT = (0, import_node_path3.resolve)((0, import_node_path3.dirname)((0, import_node_path3.resolve)(process.argv[1])), "..");
+var MANIFEST = JSON.parse((0, import_node_fs3.readFileSync)((0, import_node_path3.resolve)(PLUGIN_ROOT, "manifest.json"), "utf8"));
 var locale = /^zh[-_](HK|TW)/i.test(language) ? "zh_HK" : /^zh/i.test(language) ? "zh_CN" : { de: "de_DE", es: "es_ES", ja: "ja_JP", ko: "ko_KR", pt: "pt_PT" }[language.split(/[-_]/)[0]] || "en";
-var TEXT = JSON.parse((0, import_node_fs2.readFileSync)((0, import_node_path2.resolve)(PLUGIN_ROOT, `${locale}.json`), "utf8")).Localization;
+var TEXT = JSON.parse((0, import_node_fs3.readFileSync)((0, import_node_path3.resolve)(PLUGIN_ROOT, `${locale}.json`), "utf8")).Localization;
 var bridgeSetup = createBridgeInstaller({
   pluginRoot: PLUGIN_ROOT,
   bridgeUrl: BRIDGE_URL,
   version: MANIFEST.Version
 });
-var USAGE_BASE64 = (0, import_node_fs2.readFileSync)(
-  (0, import_node_path2.resolve)(PLUGIN_ROOT, "assets/icons/usage-base.png")
+var USAGE_BASE64 = (0, import_node_fs3.readFileSync)(
+  (0, import_node_path3.resolve)(PLUGIN_ROOT, "assets/icons/usage-base.png")
 ).toString("base64");
 var ACTION_LABELS = Object.freeze({
   launch: "BRIDGE",
@@ -4544,7 +4759,7 @@ async function handleBridgeSetupMessage(message) {
   if (action === "openGuide") {
     send({
       cmd: "openurl",
-      url: "https://github.com/UlanziTechnology/OpenCodexMicro#1-llm--agent-installation",
+      url: "https://github.com/abartiggut/ulanzi/blob/main/docs/setup-and-operations.md",
       local: false
     });
     await sendBridgeSetupStatus(message);
@@ -5033,6 +5248,9 @@ function connect() {
   });
   socket.on("error", () => socket.close());
 }
+void bridgeSetup.ensureService?.().catch((error) => {
+  console.error(`Codex Bridge auto-start failed: ${error.message}`);
+});
 connect();
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {

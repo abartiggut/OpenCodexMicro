@@ -242,7 +242,7 @@ async function handleBridgeSetupMessage(message) {
   if (action === "openGuide") {
     send({
       cmd: "openurl",
-      url: "https://github.com/UlanziTechnology/OpenCodexMicro#1-llm--agent-installation",
+      url: "https://github.com/abartiggut/ulanzi/blob/windows-port/docs/setup-and-operations.md",
       local: false
     });
     await sendBridgeSetupStatus(message);
@@ -749,6 +749,9 @@ function connect() {
   socket.on("error", () => socket.close());
 }
 
+void bridgeSetup.ensureService?.().catch(error => {
+  console.error(`Codex Bridge auto-start failed: ${error.message}`);
+});
 connect();
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

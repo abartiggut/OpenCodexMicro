@@ -1,5 +1,45 @@
 # Setup and Operations
 
+## Windows 10/11 (experimental)
+
+From the [abartiggut fork](https://github.com/abartiggut/ulanzi), install
+Codex Desktop and Ulanzi Studio 3.4.8 or later. Connect the D200. In PowerShell
+at the repository root:
+
+```powershell
+npm ci
+npm run setup:windows
+```
+
+This builds and installs the Ulanzi plugin under
+`%APPDATA%\Ulanzi\UlanziDeck\Plugins\com.ulanzi.codexmicro.ulanziPlugin` and
+the user-local Bridge under `%LOCALAPPDATA%\OpenCodexMicro`. Restart Ulanzi
+Studio, then add Codex Micro actions to the device. The plugin starts the Bridge
+service when Ulanzi Studio opens it.
+
+Close any running Codex Desktop window before pressing **Launch Codex Bridge**.
+The launcher intentionally refuses to interrupt a running session. You can also
+start it from PowerShell:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OpenCodexMicro\launch-codex.ps1"
+```
+
+The launcher uses the installed `OpenAI.Codex` package and enables CDP on
+`127.0.0.1:9222`. The Bridge API listens on `127.0.0.1:17373`. Check both
+installation and connection:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:17373/health
+```
+
+`service` should be `OpenCodexMicro` and `codexConnected` should be `true`.
+The setup panel in Ulanzi Studio reports these separately. The port cannot be
+connected while Codex is running without the launcher. A full device test needs
+at least one action assigned to a physical key.
+
+## macOS
+
 OpenCodexMicro has two installed components:
 
 ```text

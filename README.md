@@ -17,7 +17,11 @@ turns it into a native Ulanzi Studio plugin. It shows recent tasks, switches to
 the exact task displayed on a key, and provides Fast, Usage, Pin, New, Fork,
 Steer, Mic, Submit, Latest Task & Scroll, and Model & Reasoning Encoder actions.
 
-![OpenCodexMicro on an Ulanzi D200 Series](docs/images/codex-keyboard-hero.png)
+![Windows port running on a Ulanzi D200, with live Codex tasks and function keys](docs/images/d200-windows-closeup.jpg)
+
+The Windows setup on a desk, with the D200 showing the same live task keys:
+
+<img src="docs/images/d200-windows-desk.jpg" alt="Ulanzi D200 running the Windows Codex Bridge beside a keyboard and monitor" width="720">
 
 The task keys use small terminal windows with the current chat title and a
 color-coded, written status. The five states are idle, working, done, input

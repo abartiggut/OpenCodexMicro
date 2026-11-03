@@ -29,6 +29,11 @@ needed, and error; offline is shown separately. The matching function icons
 and Codex mark are included in the [icon set preview](docs/icon-set-preview.png).
 Run `npm run icons:generate` to rebuild the 196 × 196 px PNGs and preview.
 
+Codex Desktop's Windows onboarding screen explains the agent key status colors
+(this screenshot shows an earlier key design):
+
+<img src="docs/images/codex-windows-onboarding.png" alt="Codex Desktop onboarding screen with the agent key status legend in German" width="440">
+
 ## What it does
 
 | Feature | Behavior |

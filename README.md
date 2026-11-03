@@ -174,6 +174,15 @@ project targets macOS. Its installation uses different commands and a
 or the [Chinese README](README_zh.md) for that platform. The Windows commands
 at the top of this page install the abartiggut fork.
 
+## GitHub repositories
+
+- [abartiggut/ulanzi](https://github.com/abartiggut/ulanzi) is the Windows
+  development repository used by the installation commands above.
+- [abartiggut/OpenCodexMicro](https://github.com/abartiggut/OpenCodexMicro)
+  publishes the same `windows-port` branch as a GitHub-registered fork, so it
+  appears in the original project's fork list. No pull request to the original
+  project is needed to use either repository.
+
 ## License
 
 Project-authored code is released under the [MIT License](LICENSE). See the

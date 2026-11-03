@@ -21,6 +21,15 @@ and action interfaces exposed by the existing Bridge. Ulanzi did not design,
 specify, develop, or maintain CDP or Codex's CDP implementation. Read
 `NOTICE.md` before making attribution or responsibility claims.
 
+## Publishing the Windows port
+
+The development repository is `https://github.com/abartiggut/ulanzi`.
+`https://github.com/abartiggut/OpenCodexMicro` is the GitHub-registered fork
+of `UlanziTechnology/OpenCodexMicro` used for discoverability in its fork list.
+When asked to publish Windows-port changes, keep the `windows-port` branch on
+both abartiggut repositories in sync. Do not create a pull request to the
+upstream Ulanzi repository unless the user explicitly asks for one.
+
 ## Windows 10/11: install without guessing
 
 Use the `windows-port` branch. First inspect any existing checkout and the

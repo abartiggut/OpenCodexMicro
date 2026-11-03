@@ -5083,10 +5083,10 @@ async function invoke(instance, pressed) {
       return;
     }
     if (action === "usage") {
-      if (pressed) await bridgeRequest("/focus", "POST");
+      if (pressed) await bridgeRequest("/focus", "POST", 5e3);
       return;
     }
-    await bridgeRequest(`/action/${action}/${pressed ? "down" : "up"}`, "POST");
+    await bridgeRequest(`/action/${action}/${pressed ? "down" : "up"}`, "POST", 5e3);
   } catch (error) {
     send({ cmd: "logMessage", uuid: instance.uuid, actionid: instance.actionid, key: instance.key, level: "error", message: error.message });
     send({ cmd: "showAlert", uuid: instance.uuid, actionid: instance.actionid, key: instance.key });

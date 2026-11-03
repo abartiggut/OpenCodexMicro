@@ -186,6 +186,13 @@ at the top of this page install the abartiggut development repository.
   appears in the original project's fork list. No pull request to the original
   project is needed to use either repository.
 
+## Contributors
+
+The Windows port is developed and maintained by
+[Alf Müller (@AlfMueller)](https://github.com/AlfMueller) under abartiggut.
+The original OpenCodexMicro project and its contributors are credited in the
+[modification notice](NOTICE.md).
+
 ## License
 
 Project-authored code is released under the [MIT License](LICENSE). See the

@@ -57,18 +57,20 @@ Each press is bound to the displayed conversation and request; stale or
 duplicate submissions are rejected. Device layout uses `[0,7,126,126]` and
 retains the hardware-required empty text item.
 
-Task actions dynamically use the plugin's idle, working, complete, attention,
-error, and offline artwork. Usage is rendered at runtime from the allowance
-returned by the Bridge. Latest Task & Scroll mirrors task 1's status artwork.
+Task actions render the live chat title and an idle, working, complete,
+attention, error or offline label inside a small terminal window. The color
+and text change with the Bridge state. Usage is rendered at runtime from the
+allowance returned by the Bridge. Latest Task & Scroll mirrors task 1's
+status artwork.
 Latest Task & Scroll and Context Navigator show only a square image in
 `[0, 7, 126, 126]`, vertically centered in the 126×140 dial region without
 a title. Their layouts retain a hidden, empty
 `encoder-label` text item for D200X compatibility.
 
-Task 1–5 show an attention icon and a localized pending-approval or reply-needed
-label beside the task title for Codex's `awaiting-approval` and
-`awaiting-response` states. Clearing the request restores the current task state;
-displaying the state never approves or rejects a request.
+Task 1–5 show **INPUT NEEDED** (or **EINGABE NÖTIG** in German Studio) with
+the task title for Codex's `awaiting-approval` and `awaiting-response`
+states. Clearing the request restores the current task state; displaying the
+state never approves or rejects a request.
 
 Model & Reasoning is a separate dial action. Its 126×140 layout places a PNG
 model card in `[0, 7, 126, 126]`, leaving 7px above and below the image.
@@ -110,13 +112,15 @@ placed on more than one key.
 
 ## Runtime requirements
 
-- Start Codex through `~/Applications/Codex Bridge.app`.
+- On Windows, start Codex through the **Launch Codex Bridge** key or
+  `%LOCALAPPDATA%\OpenCodexMicro\launch-codex.ps1`.
+- On macOS, start Codex through `~/Applications/Codex Bridge.app`.
 - Keep the Bridge sidecar running at `127.0.0.1:17373`.
 - Allow Ulanzi Studio under macOS System Settings > Privacy & Security >
   Accessibility so the Encoder can emit mouse-wheel events.
 - Restart Ulanzi Studio after installing a new plugin build.
 
 The plugin does not require a separate device service, shortcut file, or theme
-configuration. To change shipped artwork, edit the files under
-`integration/com.ulanzi.codexmicro.ulanziPlugin/assets/icons/`, rebuild, and
+configuration. To change shipped artwork, edit `scripts/generate-icons.mjs`
+or `plugin/task-display.js`, run `npm run icons:generate`, rebuild, and
 reinstall the plugin.

@@ -1,13 +1,16 @@
-# OpenCodexMicro
+# OpenCodexMicro for Windows
 
 > This repository is an independent abartiggut fork of
 > [UlanziTechnology/OpenCodexMicro](https://github.com/UlanziTechnology/OpenCodexMicro).
-> This fork adds experimental Windows support. The original project supports
-> macOS. This fork is not maintained or endorsed by Ulanzi or OpenAI.
+> This is the abartiggut Windows 10/11 port for Ulanzi D200 Series.
+> Windows development is on the `windows-port` branch. The original project
+> supports macOS. This fork is not maintained or endorsed by Ulanzi or OpenAI.
 
-**Control Codex Desktop from an Ulanzi D200 Series through Ulanzi Studio.**
+**Control Codex Desktop from an Ulanzi D200 Series on Windows through Ulanzi Studio.**
 
-[中文说明](README_zh.md)
+[Windows setup for AI agents](docs/windows-agent-install.md) ·
+[Windows operations](docs/setup-and-operations.md#windows-1011-experimental) ·
+[macOS / 中文说明](README_zh.md)
 
 OpenCodexMicro exposes Codex's live Micro state through a loopback Bridge and
 turns it into a native Ulanzi Studio plugin. It shows recent tasks, switches to
@@ -29,7 +32,7 @@ Run `npm run icons:generate` to rebuild the 196 × 196 px PNGs and preview.
 | Five live task actions | Show Codex's Most Recent tasks with idle, working, complete, pending approval, reply needed, or error state |
 | Exact task switching | Route the selected thread through Codex's own Micro event bus |
 | Codex controls | Fast, Usage, Pin, New, Fork, Steer, Mic, and Submit |
-| Launch Codex Bridge | Press to launch Codex Bridge.app; missing or incomplete installations are installed/repaired first |
+| Launch Codex Bridge | On Windows, start or restart Codex with local CDP; on macOS, launch Codex Bridge.app |
 | Encoder navigation | Press to open task 1; turn left/right to scroll up/down through Ulanzi Studio's hotkey protocol |
 | Model & Reasoning Encoder | Turn to switch models; hold and turn to switch reasoning effort; stop at either end of each list |
 | Context Navigator Encoder | First turn opens the + / @ menu; turn left/right to move up/down; click to select, hold and turn to close; clicking while closed does nothing |
@@ -53,35 +56,34 @@ responsibility boundary.
 
 ### Windows 10/11 (experimental)
 
-The Windows port has been installed and its local Bridge and Ulanzi Studio plugin
-have been verified on a D200. The assigned BRIDGE key launched Codex with CDP;
-the Bridge and Studio both report a connection. Other physical actions remain to
-be tested.
-
-1. Install Codex Desktop and Ulanzi Studio 3.4.8 or later. Connect the D200.
-2. Install Node.js 20 or later, then open PowerShell in this repository and run:
+Install Codex Desktop, Ulanzi Studio 3.4.8 or later, Git and Node.js 20 or
+later. Connect the D200. Save any Ulanzi Studio profile edits and quit Studio
+completely, including its tray process. In PowerShell:
 
    ```powershell
+   git clone --branch windows-port https://github.com/abartiggut/ulanzi.git
+   cd ulanzi
    npm ci
    npm run setup:windows
    ```
 
-3. Restart Ulanzi Studio. Add **Codex Micro** actions to the D200 keys.
-4. Press **Launch Codex Bridge** in Ulanzi Studio, or run
-   `%LOCALAPPDATA%\OpenCodexMicro\launch-codex.ps1` in PowerShell. The launcher
-   asks an already running Codex app to close and starts it with local CDP.
-5. Check `http://127.0.0.1:17373/health`. `codexConnected` must be `true`.
+Restart Studio, assign **Codex Task 1–5** and **Launch Codex Bridge** from the
+**Codex Micro** category, then press the Bridge key. It starts or restarts
+Codex with local CDP. Check `http://127.0.0.1:17373/health`:
+`codexConnected` must be `true`.
 
-The Windows launcher closes Codex gracefully. If only its tray process remains
-after 20 seconds, it stops that process before reopening Codex. It stops if an
-open Codex dialog still needs attention. The Bridge service starts with the
-Ulanzi plugin and uses only
-local ports 17373 and 9222. See
-[Windows details](docs/setup-and-operations.md#windows-1011-experimental).
+**For a coding agent:** follow [AGENTS.md](AGENTS.md) and the
+[Windows agent checklist](docs/windows-agent-install.md). It covers existing
+installations, the Windows setup command, languages, action routing, and
+verification. The key layout is configured in Ulanzi Studio; no profile is
+bundled with the repository.
+
+The Windows port has been verified with a connected D200, Ulanzi Studio and
+Bridge. Individual physical actions may still need testing on another machine.
 
 ### macOS
 
-### Installation environment
+#### Installation environment
 
 - macOS 13 or later;
 - Codex Desktop;
@@ -89,7 +91,7 @@ local ports 17373 and 9222. See
 - Ulanzi D200 Series connected to Ulanzi Studio;
 - Node.js 20 or newer only for repository-based manual installation.
 
-### 1. LLM / Agent installation
+#### 1. LLM / Agent installation
 
 An LLM or coding agent must follow these steps:
 
@@ -106,7 +108,7 @@ An LLM or coding agent must follow these steps:
 5. Report plugin installation and Bridge connectivity separately. Do not
    reinstall a valid plugin unless an update or repair was requested.
 
-### 2. Install Bridge from Ulanzi Studio
+#### 2. Install Bridge from Ulanzi Studio
 
 After installing the Codex Micro plugin, drag any Codex Micro action onto a
 key and select it. Its shared **Codex Bridge Setup** page can:
@@ -119,7 +121,7 @@ key and select it. Its shared **Codex Bridge Setup** page can:
 The installer writes only to the current user's Applications, Application
 Support, and LaunchAgents directories and does not require `sudo`.
 
-### 3. Manual installation
+#### 3. Manual installation
 
 ```bash
 git clone https://github.com/UlanziTechnology/OpenCodexMicro.git
@@ -192,7 +194,8 @@ Accessibility** so Encoder rotation can send mouse-wheel events.
 See [Configuration](docs/configuration.md) for action behavior and layout
 guidance.
 
-The repository includes two reusable Codex skills:
+For macOS, the repository includes two reusable Codex skills. Windows agents
+should use [the Windows checklist](docs/windows-agent-install.md) instead:
 
 | Skill | Purpose |
 | --- | --- |

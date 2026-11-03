@@ -4552,6 +4552,84 @@ function permissionEncoderPng(state, choice = "once", pending = false, connected
   return pngDataUrl(pixels, width, height);
 }
 
+// plugin/task-display.js
+var STATES = Object.freeze({
+  idle: { color: "#a9bbc7", de: "BEREIT", en: "IDLE" },
+  working: { color: "#61b3ff", de: "ARBEITET", en: "WORKING" },
+  complete: { color: "#53dfab", de: "FERTIG", en: "DONE" },
+  attention: { color: "#ffc66a", de: "EINGABE N\xD6TIG", en: "INPUT NEEDED" },
+  error: { color: "#ff7887", de: "FEHLER", en: "ERROR" },
+  offline: { color: "#8595a3", de: "OFFLINE", en: "OFFLINE" }
+});
+function taskStatusKind(status) {
+  const value = String(status || "").toLowerCase();
+  if (["working", "thinking", "running", "in_progress"].includes(value)) return "working";
+  if (["unread", "complete", "completed", "done", "success"].includes(value)) return "complete";
+  if (["attention", "notification", "input", "approval", "awaiting-approval", "awaiting-response", "waiting_input", "needs_input"].includes(value)) return "attention";
+  if (["error", "failed", "failure"].includes(value)) return "error";
+  if (value === "offline") return "offline";
+  return "idle";
+}
+function escapeXml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]);
+}
+function titleLines(value) {
+  const words = String(value || "Untitled").replace(/[\u0000-\u001f]/g, " ").trim().split(/\s+/);
+  const lines = [];
+  for (const word of words) {
+    let rest = word;
+    while (rest.length > 16) {
+      if (lines.length === 3) break;
+      lines.push(rest.slice(0, 16));
+      rest = rest.slice(16);
+    }
+    if (lines.length === 3) break;
+    const last = lines.length - 1;
+    if (last >= 0 && lines[last].length + rest.length + 1 <= 16) {
+      lines[last] += ` ${rest}`;
+    } else if (rest) {
+      lines.push(rest);
+    }
+    if (lines.length === 3 && words.at(-1) !== word) break;
+  }
+  if (!lines.length) lines.push("Untitled");
+  const full = words.join(" ");
+  const shown = lines.join(" ").replace(/…$/, "");
+  if (full.length > shown.length) lines[2] = `${(lines[2] || "").slice(0, 15)}\u2026`;
+  return lines.slice(0, 3);
+}
+function taskDisplaySvg(title, status, language2 = "en") {
+  const kind = taskStatusKind(status);
+  const { color, de, en } = STATES[kind];
+  const stateLabel = /^de/i.test(language2) ? de : en;
+  const lines = titleLines(title);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="196" height="196" viewBox="0 0 196 196">
+    <defs>
+      <linearGradient id="surface" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#1c2c38"/><stop offset="1" stop-color="#0b141c"/></linearGradient>
+      <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop stop-color="${color}" stop-opacity=".95"/><stop offset=".28" stop-color="${color}" stop-opacity=".58"/><stop offset=".72" stop-color="${color}" stop-opacity=".12"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient>
+      <clipPath id="window"><rect x="15" y="16" width="166" height="162" rx="17"/></clipPath>
+    </defs>
+    <rect width="196" height="196" rx="27" fill="#090f15"/>
+    <rect x="6" y="6" width="184" height="184" rx="23" fill="url(#surface)" stroke="#354955" stroke-width="1.5"/>
+    <g clip-path="url(#window)">
+      <rect x="15" y="16" width="166" height="162" fill="#0b151e"/>
+      <rect x="15" y="16" width="166" height="31" fill="#1a2a35"/>
+      <path d="M15 47h166" stroke="#344954" stroke-width="1.5"/>
+      <ellipse cx="130" cy="159" rx="92" ry="60" fill="url(#glow)"/>
+      <path d="M24 130h148" stroke="${color}" stroke-opacity=".35" stroke-width="1"/>
+    </g>
+    <rect x="15" y="16" width="166" height="162" rx="17" fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="2"/>
+    <circle cx="29" cy="32" r="3" fill="#758b99"/><circle cx="40" cy="32" r="3" fill="#758b99"/><circle cx="51" cy="32" r="3" fill="${color}"/>
+    <text x="168" y="36" fill="#859aaa" font-family="Consolas,monospace" font-size="13" text-anchor="end">&gt;_</text>
+    <g fill="#f1f7fa" font-family="Arial,sans-serif" font-size="17" font-weight="700">
+      ${lines.map((line, index) => `<text x="27" y="${72 + index * 21}">${escapeXml(line)}</text>`).join("")}
+    </g>
+    <rect x="23" y="139" width="150" height="27" rx="7" fill="#0a141d" fill-opacity=".76" stroke="${color}" stroke-opacity=".58"/>
+    <circle cx="37" cy="152.5" r="5.5" fill="${color}"/>
+    <text x="51" y="157" fill="${color}" font-family="Arial,sans-serif" font-size="11.8" font-weight="700" letter-spacing=".7">${escapeXml(stateLabel)}</text>
+  </svg>`;
+}
+
 // plugin/app.js
 var PLUGIN_UUID = "com.ulanzi.ulanzistudio.codexmicro";
 var BRIDGE_URL = process.env.CODEX_BRIDGE_URL || "http://127.0.0.1:17373";
@@ -4722,27 +4800,18 @@ function usageRemaining(usage) {
 }
 function usageIconData(usage) {
   const remaining = usageRemaining(usage);
-  const progress = remaining === null ? "#858c8f" : remaining >= 50 ? "#2fbd7f" : remaining >= 20 ? "#e89b2d" : "#e45861";
-  const circumference = 2 * Math.PI * 57;
+  const progress = remaining === null ? "#a9bbc7" : remaining >= 50 ? "#53dfab" : remaining >= 20 ? "#ffc66a" : "#ff7887";
+  const circumference = 2 * Math.PI * 52;
   const filled = circumference * (remaining ?? 0) / 100;
   const value = remaining === null ? "\u2014" : String(remaining);
   const percent = remaining === null ? "" : "%";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="196" height="196" viewBox="0 0 196 196">
-    <defs>
-      <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur stdDeviation="4.5" result="blur"/>
-        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-    </defs>
     <image width="196" height="196" href="data:image/png;base64,${USAGE_BASE64}" xlink:href="data:image/png;base64,${USAGE_BASE64}"/>
-    <g fill="none" transform="rotate(-90 98 94)">
-      <circle cx="98" cy="94" r="58.5" stroke="#ffffff" stroke-opacity=".57" stroke-width="2.4"/>
-      <circle cx="98" cy="94" r="57" stroke="#5e6c68" stroke-opacity=".57" stroke-width="16"/>
-      <circle cx="98" cy="94" r="57" stroke="#a0aca9" stroke-width="12"/>
-      <circle cx="98" cy="94" r="57" stroke="#cdd6d3" stroke-width="6"/>
-      ${remaining === null ? "" : `<circle cx="98" cy="94" r="57" stroke="${progress}" stroke-opacity=".5" stroke-width="18" stroke-linecap="butt" stroke-dasharray="${filled} ${circumference - filled}" filter="url(#glow)"/><circle cx="98" cy="94" r="57" stroke="${progress}" stroke-width="10" stroke-linecap="butt" stroke-dasharray="${filled} ${circumference - filled}"/>`}
+    <g fill="none" transform="rotate(-90 98 86)">
+      <circle cx="98" cy="86" r="52" stroke="#304653" stroke-width="10"/>
+      ${remaining === null ? "" : `<circle cx="98" cy="86" r="52" stroke="${progress}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${filled} ${circumference - filled}"/>`}
     </g>
-    <text x="98" y="105" fill="#303638" font-family="-apple-system,BlinkMacSystemFont,Arial,sans-serif" font-size="36" font-weight="700" text-anchor="middle">${value}${percent ? `<tspan dx="2" dy="-2" font-size="18">${percent}</tspan>` : ""}</text>
+    <text x="98" y="99" fill="#eef6fb" font-family="Arial,sans-serif" font-size="38" font-weight="700" text-anchor="middle">${value}${percent ? `<tspan dx="2" dy="-3" font-size="17">${percent}</tspan>` : ""}</text>
   </svg>`;
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
@@ -4833,21 +4902,7 @@ async function handleBridgeSetupMessage(message) {
   await sendBridgeSetupStatus(message, { result, error: failure });
 }
 function taskIconPath(status) {
-  const value = String(status || "").toLowerCase();
-  if (["working", "thinking", "running", "in_progress"].includes(value)) return TASK_ICON_PATHS.working;
-  if (["unread", "complete", "completed", "done", "success"].includes(value)) return TASK_ICON_PATHS.complete;
-  if (["attention", "notification", "input", "approval", "awaiting-approval", "awaiting-response", "waiting_input", "needs_input"].includes(value)) return TASK_ICON_PATHS.attention;
-  if (["error", "failed", "failure"].includes(value)) return TASK_ICON_PATHS.error;
-  return TASK_ICON_PATHS.idle;
-}
-function shortTitle(value) {
-  const title = String(value || "Untitled").replace(/\s+/g, " ").trim();
-  return title.length > 18 ? `${title.slice(0, 17)}\u2026` : title;
-}
-function taskTitle(task) {
-  const status = String(task.status || "").toLowerCase();
-  const label = ["awaiting-approval", "approval"].includes(status) ? TEXT.AwaitingApproval : ["awaiting-response", "input", "waiting_input", "needs_input"].includes(status) ? TEXT.AwaitingResponse : null;
-  return label ? `${label} \xB7 ${shortTitle(task.title)}` : shortTitle(task.title);
+  return TASK_ICON_PATHS[taskStatusKind(status)] || TASK_ICON_PATHS.idle;
 }
 function setModelDisplay(instance) {
   const composer = latestState?.connected ? latestState.composer : null;
@@ -4933,10 +4988,11 @@ function setDisplay(instance, state, text) {
     }
   });
 }
-function setTaskDisplay(instance, path, text) {
-  const digest = `path:${path}:${text}`;
+function setTaskDisplay(instance, status, title) {
+  const digest = `task:${status}:${title}:${locale}`;
   if (!instance.active || instance.lastDisplay === digest) return;
   instance.lastDisplay = digest;
+  const svg = taskDisplaySvg(title, status, locale);
   send({
     cmd: "state",
     param: {
@@ -4944,10 +5000,10 @@ function setTaskDisplay(instance, path, text) {
         uuid: instance.uuid,
         actionid: instance.actionid,
         key: instance.key,
-        type: 2,
-        path,
-        showtext: true,
-        textdata: text
+        type: 1,
+        data: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+        showtext: false,
+        textdata: ""
       }]
     }
   });
@@ -5009,15 +5065,15 @@ function renderInstance(instance) {
     return;
   }
   if (!latestState?.connected) {
-    setTaskDisplay(instance, TASK_ICON_PATHS.idle, "Bridge Offline");
+    setTaskDisplay(instance, "offline", "Bridge Offline");
     return;
   }
   const task = latestState.slots?.[slot];
   if (!task?.threadKey) {
-    setTaskDisplay(instance, TASK_ICON_PATHS.idle, `Task ${slot + 1}`);
+    setTaskDisplay(instance, "idle", `Task ${slot + 1}`);
     return;
   }
-  setTaskDisplay(instance, taskIconPath(task.status), taskTitle(task));
+  setTaskDisplay(instance, task.status, task.title);
 }
 function renderAll() {
   for (const instance of instances.values()) renderInstance(instance);

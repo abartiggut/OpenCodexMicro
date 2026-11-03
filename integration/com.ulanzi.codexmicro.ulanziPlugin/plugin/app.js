@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { createBridgeInstaller } from "./bridge-installer.js";
 import { modelEncoderPng } from "./model-display.js";
 import { permissionEncoderPng } from "./permission-display.js";
+import { taskDisplaySvg, taskStatusKind } from "./task-display.js";
 
 const PLUGIN_UUID = "com.ulanzi.ulanzistudio.codexmicro";
 const BRIDGE_URL = process.env.CODEX_BRIDGE_URL || "http://127.0.0.1:17373";
@@ -168,32 +169,23 @@ function usageRemaining(usage) {
 function usageIconData(usage) {
   const remaining = usageRemaining(usage);
   const progress = remaining === null
-    ? "#858c8f"
+    ? "#a9bbc7"
     : remaining >= 50
-      ? "#2fbd7f"
+      ? "#53dfab"
       : remaining >= 20
-        ? "#e89b2d"
-        : "#e45861";
-  const circumference = 2 * Math.PI * 57;
+        ? "#ffc66a"
+        : "#ff7887";
+  const circumference = 2 * Math.PI * 52;
   const filled = circumference * (remaining ?? 0) / 100;
   const value = remaining === null ? "—" : String(remaining);
   const percent = remaining === null ? "" : "%";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="196" height="196" viewBox="0 0 196 196">
-    <defs>
-      <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur stdDeviation="4.5" result="blur"/>
-        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-    </defs>
     <image width="196" height="196" href="data:image/png;base64,${USAGE_BASE64}" xlink:href="data:image/png;base64,${USAGE_BASE64}"/>
-    <g fill="none" transform="rotate(-90 98 94)">
-      <circle cx="98" cy="94" r="58.5" stroke="#ffffff" stroke-opacity=".57" stroke-width="2.4"/>
-      <circle cx="98" cy="94" r="57" stroke="#5e6c68" stroke-opacity=".57" stroke-width="16"/>
-      <circle cx="98" cy="94" r="57" stroke="#a0aca9" stroke-width="12"/>
-      <circle cx="98" cy="94" r="57" stroke="#cdd6d3" stroke-width="6"/>
-      ${remaining === null ? "" : `<circle cx="98" cy="94" r="57" stroke="${progress}" stroke-opacity=".5" stroke-width="18" stroke-linecap="butt" stroke-dasharray="${filled} ${circumference - filled}" filter="url(#glow)"/><circle cx="98" cy="94" r="57" stroke="${progress}" stroke-width="10" stroke-linecap="butt" stroke-dasharray="${filled} ${circumference - filled}"/>`}
+    <g fill="none" transform="rotate(-90 98 86)">
+      <circle cx="98" cy="86" r="52" stroke="#304653" stroke-width="10"/>
+      ${remaining === null ? "" : `<circle cx="98" cy="86" r="52" stroke="${progress}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${filled} ${circumference - filled}"/>`}
     </g>
-    <text x="98" y="105" fill="#303638" font-family="-apple-system,BlinkMacSystemFont,Arial,sans-serif" font-size="36" font-weight="700" text-anchor="middle">${value}${percent ? `<tspan dx="2" dy="-2" font-size="18">${percent}</tspan>` : ""}</text>
+    <text x="98" y="99" fill="#eef6fb" font-family="Arial,sans-serif" font-size="38" font-weight="700" text-anchor="middle">${value}${percent ? `<tspan dx="2" dy="-3" font-size="17">${percent}</tspan>` : ""}</text>
   </svg>`;
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
@@ -291,24 +283,7 @@ async function handleBridgeSetupMessage(message) {
 }
 
 function taskIconPath(status) {
-  const value = String(status || "").toLowerCase();
-  if (["working", "thinking", "running", "in_progress"].includes(value)) return TASK_ICON_PATHS.working;
-  if (["unread", "complete", "completed", "done", "success"].includes(value)) return TASK_ICON_PATHS.complete;
-  if (["attention", "notification", "input", "approval", "awaiting-approval", "awaiting-response", "waiting_input", "needs_input"].includes(value)) return TASK_ICON_PATHS.attention;
-  if (["error", "failed", "failure"].includes(value)) return TASK_ICON_PATHS.error;
-  return TASK_ICON_PATHS.idle;
-}
-
-function shortTitle(value) {
-  const title = String(value || "Untitled").replace(/\s+/g, " ").trim();
-  return title.length > 18 ? `${title.slice(0, 17)}…` : title;
-}
-
-function taskTitle(task) {
-  const status = String(task.status || "").toLowerCase();
-  const label = ["awaiting-approval", "approval"].includes(status) ? TEXT.AwaitingApproval :
-    ["awaiting-response", "input", "waiting_input", "needs_input"].includes(status) ? TEXT.AwaitingResponse : null;
-  return label ? `${label} · ${shortTitle(task.title)}` : shortTitle(task.title);
+  return TASK_ICON_PATHS[taskStatusKind(status)] || TASK_ICON_PATHS.idle;
 }
 
 function setModelDisplay(instance) {
@@ -387,10 +362,11 @@ function setDisplay(instance, state, text) {
   });
 }
 
-function setTaskDisplay(instance, path, text) {
-  const digest = `path:${path}:${text}`;
+function setTaskDisplay(instance, status, title) {
+  const digest = `task:${status}:${title}:${locale}`;
   if (!instance.active || instance.lastDisplay === digest) return;
   instance.lastDisplay = digest;
+  const svg = taskDisplaySvg(title, status, locale);
   send({
     cmd: "state",
     param: {
@@ -398,10 +374,10 @@ function setTaskDisplay(instance, path, text) {
         uuid: instance.uuid,
         actionid: instance.actionid,
         key: instance.key,
-        type: 2,
-        path,
-        showtext: true,
-        textdata: text
+        type: 1,
+        data: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+        showtext: false,
+        textdata: ""
       }]
     }
   });
@@ -465,15 +441,15 @@ function renderInstance(instance) {
     return;
   }
   if (!latestState?.connected) {
-    setTaskDisplay(instance, TASK_ICON_PATHS.idle, "Bridge Offline");
+    setTaskDisplay(instance, "offline", "Bridge Offline");
     return;
   }
   const task = latestState.slots?.[slot];
   if (!task?.threadKey) {
-    setTaskDisplay(instance, TASK_ICON_PATHS.idle, `Task ${slot + 1}`);
+    setTaskDisplay(instance, "idle", `Task ${slot + 1}`);
     return;
   }
-  setTaskDisplay(instance, taskIconPath(task.status), taskTitle(task));
+  setTaskDisplay(instance, task.status, task.title);
 }
 
 function renderAll() {

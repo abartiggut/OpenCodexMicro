@@ -16,6 +16,12 @@ Steer, Mic, Submit, Latest Task & Scroll, and Model & Reasoning Encoder actions.
 
 ![OpenCodexMicro on an Ulanzi D200 Series](docs/images/codex-keyboard-hero.png)
 
+The task keys use small terminal windows with the current chat title and a
+color-coded, written status. The five states are idle, working, done, input
+needed, and error; offline is shown separately. The matching function icons
+and Codex mark are included in the [icon set preview](docs/icon-set-preview.png).
+Run `npm run icons:generate` to rebuild the 196 × 196 px PNGs and preview.
+
 ## What it does
 
 | Feature | Behavior |

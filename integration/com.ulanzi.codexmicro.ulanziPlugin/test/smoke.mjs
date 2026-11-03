@@ -196,14 +196,8 @@ try {
     message.actionid === launchEvent.actionid),
   "An already connected Codex must not be relaunched when its page becomes active");
 
-  const taskPaths = [
-    "assets/icons/task-working.png",
-    "assets/icons/task-complete.png",
-    "assets/icons/task-attention.png",
-    "assets/icons/task-error.png",
-    "assets/icons/task-idle.png"
-  ];
-  for (let index = 0; index < taskPaths.length; index += 1) {
+  const taskStates = ["WORKING", "DONE", "INPUT NEEDED", "ERROR", "IDLE"];
+  for (let index = 0; index < taskStates.length; index += 1) {
     client.send(JSON.stringify({
       cmd: "add",
       uuid: `com.ulanzi.ulanzistudio.codexmicro.task${index + 1}`,
@@ -213,21 +207,24 @@ try {
     }));
   }
   await new Promise(resolve => setTimeout(resolve, 700));
-  for (let index = 0; index < taskPaths.length; index += 1) {
+  for (let index = 0; index < taskStates.length; index += 1) {
     const taskUuid = `com.ulanzi.ulanzistudio.codexmicro.task${index + 1}`;
     const state = messages.find(message =>
       message.cmd === "state" && message.param?.statelist?.[0]?.uuid === taskUuid
     );
     const item = state?.param?.statelist?.[0];
-    assert.equal(item?.type, 2);
-    assert.equal(item?.path, taskPaths[index]);
-    assert.equal(item?.showtext, true);
+    assert.equal(item?.type, 1);
+    assert.match(item?.data || "", /^data:image\/svg\+xml;base64,/);
+    assert.equal(item?.showtext, false);
     assert.equal(Object.hasOwn(item || {}, "state"), false, "task icon update must not send a state index");
+    const taskSvg = Buffer.from(item.data.split(",")[1], "base64").toString();
+    assert.match(taskSvg, new RegExp(taskStates[index]));
   }
   const task1State = messages.find(message =>
     message.cmd === "state" && message.param?.statelist?.[0]?.uuid.endsWith(".task1")
   );
-  assert.equal(task1State?.param?.statelist?.[0]?.textdata, "Working task");
+  const task1Svg = Buffer.from(task1State.param.statelist[0].data.split(",")[1], "base64").toString();
+  assert.match(task1Svg, />Working task<\/text>/);
 
   client.send(JSON.stringify({ cmd: "keydown", uuid: "com.ulanzi.ulanzistudio.codexmicro.task1", actionid: "a1", key: "0_0", param: {} }));
   client.send(JSON.stringify({ cmd: "run", uuid: "com.ulanzi.ulanzistudio.codexmicro.task1", actionid: "a1", key: "0_0", param: {} }));
@@ -313,7 +310,7 @@ try {
   assert.match(usageItem?.data || "", /^data:image\/svg\+xml;base64,/);
   const usageSvg = Buffer.from(usageItem.data.split(",")[1], "base64").toString();
   assert.match(usageSvg, />23<tspan/);
-  assert.match(usageSvg, /#e89b2d/);
+  assert.match(usageSvg, /#ffc66a/);
   process.stdout.write("Codex Micro plugin smoke test passed.\n");
 } finally {
   child.kill("SIGTERM");

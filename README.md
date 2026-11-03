@@ -1,5 +1,10 @@
 # OpenCodexMicro
 
+> This repository is an independent abartiggut fork of
+> [UlanziTechnology/OpenCodexMicro](https://github.com/UlanziTechnology/OpenCodexMicro).
+> The original project currently supports macOS. Windows support is under
+> development here. This fork is not maintained or endorsed by Ulanzi or OpenAI.
+
 **Control Codex Desktop from an Ulanzi D200 Series through Ulanzi Studio.**
 
 [中文说明](README_zh.md)

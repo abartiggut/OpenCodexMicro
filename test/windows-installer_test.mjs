@@ -43,6 +43,9 @@ test("Windows Bridge installs for the current user and relaunches Codex through 
     assert.match(launcher, /Get-AppxPackage -Name OpenAI\.Codex/);
     assert.match(launcher, /CloseMainWindow\(\)/);
     assert.match(launcher, /Codex did not quit/);
+    assert.match(launcher, /MainWindowHandle -ne \[IntPtr\]::Zero/);
+    assert.match(launcher, /Stop-Process -Id \$codexProcess\.ProcessId -Force/);
+    assert.match(launcher, /Codex remained in the tray/);
     assert.match(launcher, /--remote-debugging-address=127\.0\.0\.1/);
 
     await installer.launch();

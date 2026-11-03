@@ -19,7 +19,8 @@ service when Ulanzi Studio opens it.
 
 Press **Launch Codex Bridge**. If Codex is already running without CDP, the
 launcher asks it to close, waits for the process to exit, and starts it with
-the local debug port. Finish any open Codex dialog if it cannot close. You can
+the local debug port. If only the tray process remains after 20 seconds, the
+launcher stops it. Finish any open Codex dialog if it cannot close. You can
 also run the launcher from PowerShell:
 
 ```powershell

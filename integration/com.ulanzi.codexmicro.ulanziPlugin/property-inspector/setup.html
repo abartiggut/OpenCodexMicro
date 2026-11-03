@@ -231,22 +231,22 @@
           app:"Codex-Starter", needLaunch:"Codex über die Bridge-Taste starten oder neu starten.",
           confirm:"Codex Bridge im lokalen Benutzerordner installieren oder reparieren?",
           bridgeAppInfoTitle:"Was ist der Codex-Starter?",
-          bridgeAppDescription:"Der lokale Starter schliesst eine bereits laufende Codex App regulär und öffnet sie mit CDP auf 127.0.0.1 erneut.",
+          bridgeAppDescription:"Der lokale Starter schliesst Codex und öffnet es mit CDP auf 127.0.0.1 erneut. Bleibt Codex im Tray aktiv, beendet er den Hintergrundprozess nach 20 Sekunden.",
           bridgeAppSafety:"Bridge und CDP kommunizieren ausschliesslich über lokale Adressen. Der Starter verändert weder Codex noch Konten oder Projekte.",
           backgroundTitle:"Lokaler Bridge-Dienst und Node.js",
           launchAgentDescription:"Ulanzi Studio startet den lokalen Bridge-Dienst beim Öffnen des Plugins. Der Dienst lauscht nur auf 127.0.0.1.",
           nodeSelectionStrategy:"Der Installer verwendet Node.js 20 oder neuer aus Ulanzi Studio oder dem System.",
-          launchActionHelp:"Codex Bridge starten. Ein bereits laufendes Codex wird regulär geschlossen und mit lokaler CDP-Verbindung neu gestartet."
+          launchActionHelp:"Codex Bridge starten. Ein laufendes Codex wird geschlossen; ein verbleibender Tray-Prozess wird beendet. Danach startet Codex mit lokaler CDP-Verbindung."
         } : {
           app:"Codex launcher", needLaunch:"Launch or restart Codex through the Bridge key.",
           confirm:"Install or repair Codex Bridge in your local user folder?",
           bridgeAppInfoTitle:"What is the Codex launcher?",
-          bridgeAppDescription:"The local launcher closes an already running Codex app gracefully, then reopens it with CDP on 127.0.0.1.",
+          bridgeAppDescription:"The local launcher closes Codex and reopens it with CDP on 127.0.0.1. If Codex remains in the tray, it stops the background process after 20 seconds.",
           bridgeAppSafety:"Bridge and CDP communicate only through local addresses. The launcher does not modify Codex, accounts, or projects.",
           backgroundTitle:"Local Bridge service and Node.js",
           launchAgentDescription:"Ulanzi Studio starts the local Bridge service when its plugin opens. The service listens only on 127.0.0.1.",
           nodeSelectionStrategy:"The installer uses Node.js 20 or later from Ulanzi Studio or the system.",
-          launchActionHelp:"Launch Codex Bridge. An already running Codex app is closed gracefully and restarted with local CDP."
+          launchActionHelp:"Launch Codex Bridge. A running Codex app is closed; any remaining tray process is stopped. Codex then starts with local CDP."
         });
         document.getElementById("nodeInstallRecommendation").hidden = true;
         document.getElementById("ulanziNodeSignatureNotice").hidden = true;

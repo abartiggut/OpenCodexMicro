@@ -48,8 +48,9 @@ responsibility boundary.
 ### Windows 10/11 (experimental)
 
 The Windows port has been installed and its local Bridge and Ulanzi Studio plugin
-have been verified on a D200. A full physical-key test still requires launching
-Codex with the Bridge and assigning actions in Ulanzi Studio.
+have been verified on a D200. The assigned BRIDGE key launched Codex with CDP;
+the Bridge and Studio both report a connection. Other physical actions remain to
+be tested.
 
 1. Install Codex Desktop and Ulanzi Studio 3.4.8 or later. Connect the D200.
 2. Install Node.js 20 or later, then open PowerShell in this repository and run:
@@ -65,8 +66,10 @@ Codex with the Bridge and assigning actions in Ulanzi Studio.
    asks an already running Codex app to close and starts it with local CDP.
 5. Check `http://127.0.0.1:17373/health`. `codexConnected` must be `true`.
 
-The Windows launcher closes Codex gracefully and stops if it cannot close an
-open dialog. The Bridge service starts with the Ulanzi plugin and uses only
+The Windows launcher closes Codex gracefully. If only its tray process remains
+after 20 seconds, it stops that process before reopening Codex. It stops if an
+open Codex dialog still needs attention. The Bridge service starts with the
+Ulanzi plugin and uses only
 local ports 17373 and 9222. See
 [Windows details](docs/setup-and-operations.md#windows-1011-experimental).
 

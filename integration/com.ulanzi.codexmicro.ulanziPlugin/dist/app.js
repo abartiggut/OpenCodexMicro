@@ -3792,7 +3792,22 @@ if ($running) {
     if (-not $running) { break }
     Start-Sleep -Milliseconds 200
   }
-  if ($running) { throw 'Codex did not quit. Finish any open dialog, then press the Bridge key again.' }
+  if ($running) {
+    foreach ($codexProcess in $running) {
+      $window = Get-Process -Id $codexProcess.ProcessId -ErrorAction SilentlyContinue
+      if ($window -and $window.MainWindowHandle -ne [IntPtr]::Zero) {
+        throw 'Codex did not quit. Finish any open dialog, then press the Bridge key again.'
+      }
+      Stop-Process -Id $codexProcess.ProcessId -Force -ErrorAction Stop
+    }
+    for ($attempt = 0; $attempt -lt 25; $attempt++) {
+      $running = @(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" |
+        Where-Object { $_.ExecutablePath -like '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' -and $_.CommandLine -notmatch '--type=' })
+      if (-not $running) { break }
+      Start-Sleep -Milliseconds 200
+    }
+    if ($running) { throw 'Codex remained in the tray after closing. Quit it manually, then press the Bridge key again.' }
+  }
 }
 
 $package = Get-AppxPackage -Name OpenAI.Codex | Sort-Object Version -Descending | Select-Object -First 1

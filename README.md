@@ -1,8 +1,11 @@
 # OpenCodexMicro for Windows and Ulanzi D200
 
 Control Codex Desktop from a Ulanzi D200 through Ulanzi Studio on Windows
-10/11. This is the independent **abartiggut Windows port**. Its default branch
-is `windows-port`; the installation commands below use this repository.
+10/11. This independent **abartiggut Windows port** is published in a
+[development repository](https://github.com/abartiggut/ulanzi) and a
+[GitHub-registered fork](https://github.com/abartiggut/OpenCodexMicro).
+Both use `windows-port` as the default branch. The installation commands below
+clone the development repository.
 
 **Start here:** [Install on Windows](#install-on-windows) ·
 [Agent installation checklist](docs/windows-agent-install.md) ·
@@ -172,7 +175,7 @@ The original [UlanziTechnology/OpenCodexMicro](https://github.com/UlanziTechnolo
 project targets macOS. Its installation uses different commands and a
 `Codex Bridge.app`. See this fork's [macOS operations](docs/setup-and-operations.md#macos)
 or the [Chinese README](README_zh.md) for that platform. The Windows commands
-at the top of this page install the abartiggut fork.
+at the top of this page install the abartiggut development repository.
 
 ## GitHub repositories
 

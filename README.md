@@ -1,21 +1,84 @@
-# OpenCodexMicro for Windows
+# OpenCodexMicro for Windows and Ulanzi D200
 
-> This repository is an independent abartiggut fork of
-> [UlanziTechnology/OpenCodexMicro](https://github.com/UlanziTechnology/OpenCodexMicro).
-> This is the abartiggut Windows 10/11 port for Ulanzi D200 Series.
-> Windows development is on the `windows-port` branch. The original project
-> supports macOS. This fork is not maintained or endorsed by Ulanzi or OpenAI.
+Control Codex Desktop from a Ulanzi D200 through Ulanzi Studio on Windows
+10/11. This is the independent **abartiggut Windows port**. Its default branch
+is `windows-port`; the installation commands below use this repository.
 
-**Control Codex Desktop from an Ulanzi D200 Series on Windows through Ulanzi Studio.**
-
-[Windows setup for AI agents](docs/windows-agent-install.md) ·
-[Windows operations](docs/setup-and-operations.md#windows-1011-experimental) ·
-[macOS / 中文说明](README_zh.md)
+**Start here:** [Install on Windows](#install-on-windows) ·
+[Agent installation checklist](docs/windows-agent-install.md) ·
+[Windows troubleshooting](docs/setup-and-operations.md#windows-1011-experimental)
 
 OpenCodexMicro exposes Codex's live Micro state through a loopback Bridge and
 turns it into a native Ulanzi Studio plugin. It shows recent tasks, switches to
 the exact task displayed on a key, and provides Fast, Usage, Pin, New, Fork,
 Steer, Mic, Submit, Latest Task & Scroll, and Model & Reasoning Encoder actions.
+
+## Install on Windows
+
+### Requirements
+
+- Windows 10/11 with Codex Desktop installed.
+- Ulanzi Studio 3.4.8 or later and a connected Ulanzi D200 Series.
+- Git and Node.js 20 or later.
+
+Save any Ulanzi Studio profile changes, then quit Studio completely, including
+its tray process. Open PowerShell and run:
+
+```powershell
+git clone --branch windows-port https://github.com/abartiggut/ulanzi.git
+cd ulanzi
+npm ci
+npm run setup:windows
+```
+
+This builds and installs **Codex Micro** into the current user's Ulanzi Studio
+plugins and installs the local Bridge in `%LOCALAPPDATA%\OpenCodexMicro`.
+`npm run setup` is the macOS installer; use `npm run setup:windows` here.
+
+Restart Ulanzi Studio. In the **Codex Micro** action category, assign
+**Codex Task 1–5** to five keys and **Launch Codex Bridge** to another key.
+The German Studio labels are **Codex-Aufgabe 1–5** and **Codex Bridge starten**.
+Press the Bridge key. It starts Codex with the required local connection and
+may first close a Codex instance that was already running. If you are following
+these steps inside Codex itself, save your work before pressing that key.
+
+Check the connection in PowerShell:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:17373/health
+```
+
+The response should contain `service: OpenCodexMicro` and
+`codexConnected: true`. If the Bridge key has not yet been assigned, start
+Codex through the installed launcher:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OpenCodexMicro\launch-codex.ps1"
+```
+
+The key layout is configured in Ulanzi Studio; no profile is bundled. To open
+the Codex page from a main-deck key, use Studio's **Pages → Go to Page** action
+and select the page containing **Launch Codex Bridge**.
+
+**For an AI agent:** follow [AGENTS.md](AGENTS.md) and the
+[Windows agent installation checklist](docs/windows-agent-install.md). They
+cover existing installations, exact action IDs, language settings, Bridge
+routes and verification without guessing.
+
+## Language and key controls
+
+Ulanzi Studio's interface language selects the plugin's action names. The
+plugin includes English, German, Spanish, Portuguese, Japanese, Korean and
+Chinese translations. German task cards show German status labels; other
+supported Studio languages currently show English task-card statuses. There
+is no npm language flag. Codex Desktop's language is independent of Studio's.
+
+Ulanzi Studio receives the physical key press, the Codex Micro plugin sends
+the action to the local Bridge, and the Bridge controls Codex Desktop. The
+[action and command table](docs/windows-agent-install.md#how-keys-control-codex)
+lists every key, encoder, stable action ID and local route.
+
+## See it running
 
 ![Windows port running on a Ulanzi D200, with live Codex tasks and function keys](docs/images/d200-windows-closeup.jpg)
 
@@ -23,13 +86,12 @@ The Windows setup on a desk, with the D200 showing the same live task keys:
 
 <img src="docs/images/d200-windows-desk.jpg" alt="Ulanzi D200 running the Windows Codex Bridge beside a keyboard and monitor" width="720">
 
-The chat titles on task keys 3 and 4 are anonymized in both photographs.
-
-The task keys use small terminal windows with the current chat title and a
-color-coded, written status. The five states are idle, working, done, input
-needed, and error; offline is shown separately. The matching function icons
-and Codex mark are included in the [icon set preview](docs/icon-set-preview.png).
-Run `npm run icons:generate` to rebuild the 196 × 196 px PNGs and preview.
+The chat titles on task keys 3 and 4 are anonymized in both photographs. Task
+keys show the current chat title and a color-coded written status: idle,
+working, done, input needed or error. Offline is shown separately. The
+matching function icons and Codex mark are in the
+[icon set preview](docs/icon-set-preview.png). Run `npm run icons:generate` to
+rebuild the 196 × 196 px assets.
 
 Codex Desktop's Windows onboarding screen explains the agent key status colors
 (this screenshot shows an earlier key design):
@@ -43,7 +105,7 @@ Codex Desktop's Windows onboarding screen explains the agent key status colors
 | Five live task actions | Show Codex's Most Recent tasks with idle, working, complete, pending approval, reply needed, or error state |
 | Exact task switching | Route the selected thread through Codex's own Micro event bus |
 | Codex controls | Fast, Usage, Pin, New, Fork, Steer, Mic, and Submit |
-| Launch Codex Bridge | On Windows, start or restart Codex with local CDP; on macOS, launch Codex Bridge.app |
+| Launch Codex Bridge | Start or restart Codex on Windows with local CDP |
 | Encoder navigation | Press to open task 1; turn left/right to scroll up/down through Ulanzi Studio's hotkey protocol |
 | Model & Reasoning Encoder | Turn to switch models; hold and turn to switch reasoning effort; stop at either end of each list |
 | Context Navigator Encoder | First turn opens the + / @ menu; turn left/right to move up/down; click to select, hold and turn to close; clicking while closed does nothing |
@@ -62,112 +124,6 @@ state and action interfaces exposed through the existing local Bridge; Ulanzi
 did not participate in the design, specification, development, or maintenance
 of CDP or Codex's CDP implementation. See [NOTICE.md](NOTICE.md) for the full
 responsibility boundary.
-
-## Installation
-
-### Windows 10/11 (experimental)
-
-Install Codex Desktop, Ulanzi Studio 3.4.8 or later, Git and Node.js 20 or
-later. Connect the D200. Save any Ulanzi Studio profile edits and quit Studio
-completely, including its tray process. In PowerShell:
-
-   ```powershell
-   git clone --branch windows-port https://github.com/abartiggut/ulanzi.git
-   cd ulanzi
-   npm ci
-   npm run setup:windows
-   ```
-
-Restart Studio, assign **Codex Task 1–5** and **Launch Codex Bridge** from the
-**Codex Micro** category, then press the Bridge key. It starts or restarts
-Codex with local CDP. Check `http://127.0.0.1:17373/health`:
-`codexConnected` must be `true`.
-
-**For a coding agent:** follow [AGENTS.md](AGENTS.md) and the
-[Windows agent checklist](docs/windows-agent-install.md). It covers existing
-installations, the Windows setup command, languages, action routing, and
-verification. The key layout is configured in Ulanzi Studio; no profile is
-bundled with the repository.
-
-The Windows port has been verified with a connected D200, Ulanzi Studio and
-Bridge. Individual physical actions may still need testing on another machine.
-
-### macOS
-
-#### Installation environment
-
-- macOS 13 or later;
-- Codex Desktop;
-- Ulanzi Studio 3.0.1 or later;
-- Ulanzi D200 Series connected to Ulanzi Studio;
-- Node.js 20 or newer only for repository-based manual installation.
-
-#### 1. LLM / Agent installation
-
-An LLM or coding agent must follow these steps:
-
-1. Read [AGENTS.md](AGENTS.md) and inspect the installed Ulanzi Studio plugin
-   manifests under `~/Library/Application Support/Ulanzi/UlanziDeck/Plugins/`.
-2. Treat Codex Micro as installed only when manifest UUID
-   `com.ulanzi.ulanzistudio.codexmicro` is present and its `CodePath` exists.
-3. If it is missing or invalid, load
-   [`$install-ulanzi-studio-plugin`](skills/install-ulanzi-studio-plugin/SKILL.md),
-   install the plugin, and verify its manifest and entry point.
-4. After the plugin is verified, load
-   [`$setup-codex-bridge`](skills/setup-codex-bridge/SKILL.md), install or repair
-   `Codex Bridge.app` and its sidecar, and verify the local health endpoint.
-5. Report plugin installation and Bridge connectivity separately. Do not
-   reinstall a valid plugin unless an update or repair was requested.
-
-#### 2. Install Bridge from Ulanzi Studio
-
-After installing the Codex Micro plugin, drag any Codex Micro action onto a
-key and select it. Its shared **Codex Bridge Setup** page can:
-
-- show whether `Codex Bridge.app`, the Bridge service, and CDP are available;
-- install or repair the bundled Bridge without a repository or npm directory;
-- launch `~/Applications/Codex Bridge.app`; and
-- recheck the connection or open the full installation guide.
-
-The installer writes only to the current user's Applications, Application
-Support, and LaunchAgents directories and does not require `sudo`.
-
-#### 3. Manual installation
-
-```bash
-git clone https://github.com/UlanziTechnology/OpenCodexMicro.git
-cd OpenCodexMicro
-npm install
-npm run install:plugin
-npm run setup
-```
-
-Quit Ulanzi Studio before running `npm run install:plugin`. The command
-validates and atomically installs the prebuilt plugin. `npm run setup` builds
-the loopback Bridge sidecar, registers its user LaunchAgent, and installs
-`Codex Bridge.app` in `~/Applications`.
-
-Reopen Ulanzi Studio. Quit Codex Desktop, then open
-`~/Applications/Codex Bridge.app`; the wrapper starts Codex with a
-loopback-only CDP endpoint. Confirm the connection with:
-
-```bash
-curl http://127.0.0.1:17373/health
-curl http://127.0.0.1:17373/state
-```
-
-In Ulanzi Studio, drag the Codex Micro actions onto the desired keys. See
-[Setup and operations](docs/setup-and-operations.md) for installed paths,
-diagnostics, updates, and uninstall instructions.
-
-> **Important:** When using Codex Micro, always launch Codex through
-> `~/Applications/Codex Bridge.app`. Do not open Codex Desktop directly.
->
-> Launch command:
->
-> ```bash
-> open ~/Applications/Codex\ Bridge.app
-> ```
 
 ## Configure
 
@@ -199,26 +155,24 @@ and turning either way closes the menu without confirming. Clicking or holding
 and turning while the menu is closed does nothing. It uses structural identifiers rather than translated
 button labels. Update both the plugin and Bridge when adding this feature.
 
-On macOS, enable Ulanzi Studio in **System Settings > Privacy & Security >
-Accessibility** so Encoder rotation can send mouse-wheel events.
-
 See [Configuration](docs/configuration.md) for action behavior and layout
 guidance.
 
-For macOS, the repository includes two reusable Codex skills. Windows agents
-should use [the Windows checklist](docs/windows-agent-install.md) instead:
-
-| Skill | Purpose |
-| --- | --- |
-| [`setup-codex-bridge`](skills/setup-codex-bridge/SKILL.md) | Install, update, verify, or repair `Codex Bridge.app` and its sidecar |
-| [`install-ulanzi-studio-plugin`](skills/install-ulanzi-studio-plugin/SKILL.md) | Install the repository's prebuilt plugin directory into Ulanzi Studio |
-
 ## Documentation
 
+- [Windows installation for AI agents](docs/windows-agent-install.md)
+- [Windows setup and troubleshooting](docs/setup-and-operations.md#windows-1011-experimental)
 - [Configuration](docs/configuration.md)
-- [Setup and operations](docs/setup-and-operations.md)
 - [Architecture](docs/architecture.md)
 - [Engineering constraints](docs/errors.md)
+
+## macOS and the original project
+
+The original [UlanziTechnology/OpenCodexMicro](https://github.com/UlanziTechnology/OpenCodexMicro)
+project targets macOS. Its installation uses different commands and a
+`Codex Bridge.app`. See this fork's [macOS operations](docs/setup-and-operations.md#macos)
+or the [Chinese README](README_zh.md) for that platform. The Windows commands
+at the top of this page install the abartiggut fork.
 
 ## License
 

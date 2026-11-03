@@ -5,10 +5,11 @@ Codex Micro category and drag a keypad action onto a key or an Encoder action
 onto a dial position.
 
 Select any configured action to open the shared **Codex Bridge Setup** page.
-The page distinguishes the wrapper app installation, Bridge background
-service, and Codex CDP connection. It can install or repair the Bridge from
-resources bundled with the plugin, launch Codex Bridge, and recheck status.
-No repository or npm working directory is required for this flow.
+On Windows, first install the plugin and Bridge with `npm run setup:windows`
+from [this fork](https://github.com/abartiggut/ulanzi). The setup page then
+shows Bridge and Codex CDP status and can repair or launch the Bridge from
+resources bundled with the plugin. On macOS it also shows the wrapper app.
+Once the plugin is installed, the setup-page controls need no npm directory.
 
 ## Actions
 
@@ -19,7 +20,7 @@ No repository or npm working directory is required for this flow.
 | Usage | Show remaining usage; press to focus Codex |
 | Pin | Pin or unpin the active task |
 | New | Create a new Codex task |
-| Launch Codex Bridge | Launch Codex Bridge.app; install or repair missing app/service components first, then launch |
+| Launch Codex Bridge | On Windows, start Codex with the local Bridge launcher; on macOS, launch Codex Bridge.app |
 | Latest Task & Scroll (Encoder) | Press to open task 1; turn left/right to send mouse-wheel up/down through the Ulanzi hotkey protocol |
 | Model & Reasoning (Encoder) | Turn right toward the highest model entry, left toward the lowest; hold and turn right/left to raise/lower reasoning effort; neither list wraps |
 | Context Navigator (Encoder) | First turn opens the + / @ menu; turn left/right to move up/down; click to select, hold and turn to close; clicking while closed does nothing |

@@ -60,12 +60,14 @@ Codex with the Bridge and assigning actions in Ulanzi Studio.
    ```
 
 3. Restart Ulanzi Studio. Add **Codex Micro** actions to the D200 keys.
-4. Close any running Codex app, then press **Launch Codex Bridge** in Ulanzi
-   Studio, or run `%LOCALAPPDATA%\OpenCodexMicro\launch-codex.ps1` in PowerShell.
+4. Press **Launch Codex Bridge** in Ulanzi Studio, or run
+   `%LOCALAPPDATA%\OpenCodexMicro\launch-codex.ps1` in PowerShell. The launcher
+   asks an already running Codex app to close and starts it with local CDP.
 5. Check `http://127.0.0.1:17373/health`. `codexConnected` must be `true`.
 
-The Windows launcher never closes an existing Codex session. The Bridge service
-starts with the Ulanzi plugin and uses only local ports 17373 and 9222. See
+The Windows launcher closes Codex gracefully and stops if it cannot close an
+open dialog. The Bridge service starts with the Ulanzi plugin and uses only
+local ports 17373 and 9222. See
 [Windows details](docs/setup-and-operations.md#windows-1011-experimental).
 
 ### macOS

@@ -228,25 +228,25 @@
       if (navigator.platform?.startsWith("Win") || navigator.userAgentData?.platform === "Windows") {
         const german = locale === "de";
         Object.assign(t, german ? {
-          app:"Codex-Starter", needLaunch:"Codex schliessen und über Codex Bridge starten.",
+          app:"Codex-Starter", needLaunch:"Codex über die Bridge-Taste starten oder neu starten.",
           confirm:"Codex Bridge im lokalen Benutzerordner installieren oder reparieren?",
           bridgeAppInfoTitle:"Was ist der Codex-Starter?",
-          bridgeAppDescription:"Der lokale Starter öffnet die offizielle Codex App mit CDP auf 127.0.0.1. Schliessen Sie eine bereits laufende Codex App vorher selbst.",
+          bridgeAppDescription:"Der lokale Starter schliesst eine bereits laufende Codex App regulär und öffnet sie mit CDP auf 127.0.0.1 erneut.",
           bridgeAppSafety:"Bridge und CDP kommunizieren ausschliesslich über lokale Adressen. Der Starter verändert weder Codex noch Konten oder Projekte.",
           backgroundTitle:"Lokaler Bridge-Dienst und Node.js",
           launchAgentDescription:"Ulanzi Studio startet den lokalen Bridge-Dienst beim Öffnen des Plugins. Der Dienst lauscht nur auf 127.0.0.1.",
           nodeSelectionStrategy:"Der Installer verwendet Node.js 20 oder neuer aus Ulanzi Studio oder dem System.",
-          launchActionHelp:"Codex Bridge starten. Wenn Codex bereits ohne Bridge läuft, Codex zuerst schliessen und erneut drücken."
+          launchActionHelp:"Codex Bridge starten. Ein bereits laufendes Codex wird regulär geschlossen und mit lokaler CDP-Verbindung neu gestartet."
         } : {
-          app:"Codex launcher", needLaunch:"Close Codex, then launch it through Codex Bridge.",
+          app:"Codex launcher", needLaunch:"Launch or restart Codex through the Bridge key.",
           confirm:"Install or repair Codex Bridge in your local user folder?",
           bridgeAppInfoTitle:"What is the Codex launcher?",
-          bridgeAppDescription:"The local launcher opens the official Codex app with CDP on 127.0.0.1. Close any running Codex app first.",
+          bridgeAppDescription:"The local launcher closes an already running Codex app gracefully, then reopens it with CDP on 127.0.0.1.",
           bridgeAppSafety:"Bridge and CDP communicate only through local addresses. The launcher does not modify Codex, accounts, or projects.",
           backgroundTitle:"Local Bridge service and Node.js",
           launchAgentDescription:"Ulanzi Studio starts the local Bridge service when its plugin opens. The service listens only on 127.0.0.1.",
           nodeSelectionStrategy:"The installer uses Node.js 20 or later from Ulanzi Studio or the system.",
-          launchActionHelp:"Launch Codex Bridge. If Codex is already running without the Bridge, close Codex and press again."
+          launchActionHelp:"Launch Codex Bridge. An already running Codex app is closed gracefully and restarted with local CDP."
         });
         document.getElementById("nodeInstallRecommendation").hidden = true;
         document.getElementById("ulanziNodeSignatureNotice").hidden = true;

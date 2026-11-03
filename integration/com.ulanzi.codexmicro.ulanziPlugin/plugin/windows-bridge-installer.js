@@ -62,10 +62,22 @@ function Test-CodexDebugEndpoint {
 }
 if (Test-CodexDebugEndpoint) { exit 0 }
 
-$running = Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" |
-  Where-Object { $_.ExecutablePath -like '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' -and $_.CommandLine -notmatch '--type=' }
+$running = @(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" |
+  Where-Object { $_.ExecutablePath -like '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' -and $_.CommandLine -notmatch '--type=' })
 if ($running) {
-  throw 'Codex is already running without the Bridge. Close Codex, then launch it from Ulanzi Studio.'
+  foreach ($codexProcess in $running) {
+    $window = Get-Process -Id $codexProcess.ProcessId -ErrorAction SilentlyContinue
+    if (-not $window -or -not $window.CloseMainWindow()) {
+      throw 'Codex is running without a closable window. Quit Codex manually, then press the Bridge key again.'
+    }
+  }
+  for ($attempt = 0; $attempt -lt 100; $attempt++) {
+    $running = @(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" |
+      Where-Object { $_.ExecutablePath -like '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' -and $_.CommandLine -notmatch '--type=' })
+    if (-not $running) { break }
+    Start-Sleep -Milliseconds 200
+  }
+  if ($running) { throw 'Codex did not quit. Finish any open dialog, then press the Bridge key again.' }
 }
 
 $package = Get-AppxPackage -Name OpenAI.Codex | Sort-Object Version -Descending | Select-Object -First 1

@@ -2,7 +2,7 @@
   "Author": "OpenCodexMicro",
   "Name": "Codex Micro",
   "Overview": "Control Codex Desktop tasks and actions from Ulanzi D200 Series in Ulanzi Studio.",
-  "Description": "Control Codex Desktop from Ulanzi D200 Series through Ulanzi Studio. Five live task keys, Codex actions, encoders, and a local Bridge. Experimental Windows 10/11 support in the abartiggut fork; macOS 13+ from the original project. Setup: https://github.com/abartiggut/ulanzi/tree/windows-port#installation. Windows: npm ci; npm run setup:windows; restart Ulanzi Studio; close Codex and launch it using the Bridge action. macOS: see the original installation guide. Requires Codex Desktop and Ulanzi Studio. Only local loopback ports are used.",
+  "Description": "Control Codex Desktop from Ulanzi D200 Series through Ulanzi Studio. Five live task keys, Codex actions, encoders, and a local Bridge. Experimental Windows 10/11 support in the abartiggut fork; macOS 13+ from the original project. Setup: https://github.com/abartiggut/ulanzi/tree/windows-port#installation. Windows: npm ci; npm run setup:windows; restart Ulanzi Studio; launch or restart Codex using the Bridge action. macOS: see the original installation guide. Requires Codex Desktop and Ulanzi Studio. Only local loopback ports are used.",
   "Icon": "assets/icons/plugin.png",
   "Category": "AI",
   "CategoryIcon": "assets/icons/plugin.png",
@@ -338,7 +338,7 @@
       "Icon": "assets/icons/plugin.png",
       "PropertyInspectorPath": "property-inspector/setup.html",
       "UUID": "com.ulanzi.ulanzistudio.codexmicro.launch",
-      "Tooltip": "Launch Codex through the local Bridge. Close an already running Codex app first on Windows.",
+      "Tooltip": "Launch or restart Codex through the local Bridge. A running Codex app is closed gracefully.",
       "Controllers": [
         "Keypad"
       ],

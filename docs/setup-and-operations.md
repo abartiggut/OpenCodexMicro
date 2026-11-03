@@ -17,9 +17,10 @@ the user-local Bridge under `%LOCALAPPDATA%\OpenCodexMicro`. Restart Ulanzi
 Studio, then add Codex Micro actions to the device. The plugin starts the Bridge
 service when Ulanzi Studio opens it.
 
-Close any running Codex Desktop window before pressing **Launch Codex Bridge**.
-The launcher intentionally refuses to interrupt a running session. You can also
-start it from PowerShell:
+Press **Launch Codex Bridge**. If Codex is already running without CDP, the
+launcher asks it to close, waits for the process to exit, and starts it with
+the local debug port. Finish any open Codex dialog if it cannot close. You can
+also run the launcher from PowerShell:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OpenCodexMicro\launch-codex.ps1"

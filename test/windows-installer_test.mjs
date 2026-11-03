@@ -11,7 +11,7 @@ const pluginRoot = fileURLToPath(new URL(
   "../integration/com.ulanzi.codexmicro.ulanziPlugin/", import.meta.url
 ));
 
-test("Windows Bridge installs for the current user and refuses to replace a running Codex", async () => {
+test("Windows Bridge installs for the current user and relaunches Codex through the local bridge", async () => {
   const home = await mkdtemp(join(tmpdir(), "codex-micro-win-"));
   const commands = [];
   const health = createServer((_request, response) => {
@@ -41,7 +41,8 @@ test("Windows Bridge installs for the current user and refuses to replace a runn
     await access(join(home, "AppData", "Local", "OpenCodexMicro", "bridge.mjs"));
     const launcher = await readFile(installed.appPath, "utf8");
     assert.match(launcher, /Get-AppxPackage -Name OpenAI\.Codex/);
-    assert.match(launcher, /Codex is already running without the Bridge/);
+    assert.match(launcher, /CloseMainWindow\(\)/);
+    assert.match(launcher, /Codex did not quit/);
     assert.match(launcher, /--remote-debugging-address=127\.0\.0\.1/);
 
     await installer.launch();

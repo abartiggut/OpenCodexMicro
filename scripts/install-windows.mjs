@@ -13,4 +13,4 @@ const installer = createWindowsBridgeInstaller({
 const result = await installer.install();
 console.log(`Codex Bridge installed: ${result.appPath}`);
 console.log(`Bridge service online: ${result.serviceOnline}`);
-console.log("Close the running Codex app before using Launch Codex Bridge in Ulanzi Studio.");
+console.log("Use Launch Codex Bridge in Ulanzi Studio to start or restart Codex with local CDP.");

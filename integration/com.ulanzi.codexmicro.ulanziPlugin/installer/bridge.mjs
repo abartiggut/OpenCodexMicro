@@ -4671,8 +4671,30 @@ var CodexCdpClient = class {
   async refreshRendererResources() {
     const { frameTree } = await this.sendCommand("Page.getResourceTree", {});
     const urls = collectRendererScriptUrls(frameTree);
+    if (!urls.some((url) => url.includes("/assets/codex-micro-slot-signals-"))) {
+      const loaded = /* @__PURE__ */ new Set();
+      const collect = (raw) => {
+        try {
+          const message = JSON.parse(String(raw));
+          if (message.method === "Debugger.scriptParsed" && message.params?.url?.startsWith("app://") && message.params.url.includes("/assets/") && message.params.url.endsWith(".js")) {
+            loaded.add(message.params.url);
+          }
+        } catch {
+        }
+      };
+      this.socket.on("message", collect);
+      try {
+        await this.sendCommand("Debugger.enable", {});
+        urls.push(...loaded);
+      } finally {
+        await this.sendCommand("Debugger.disable", {}).catch(() => {
+        });
+        this.socket?.off("message", collect);
+      }
+    }
     await this.evaluate(`(() => {
-      globalThis[Symbol.for("codex-keyboard-renderer-resource-urls")] = ${JSON.stringify(urls)};
+      const key = Symbol.for("codex-keyboard-renderer-resource-urls");
+      globalThis[key] = [...new Set([...(globalThis[key] ?? []), ...${JSON.stringify(urls)}])];
       return true;
     })()`);
   }
@@ -4932,7 +4954,7 @@ var nextReconnectAt = 0;
 var composerRevision = 0;
 async function focusCodex() {
   if (process.platform === "win32") {
-    const script = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Focus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int n); }'; $p = Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if (-not $p) { exit 1 }; [Focus]::ShowWindowAsync($p.MainWindowHandle, 9) | Out-Null; [Focus]::SetForegroundWindow($p.MainWindowHandle) | Out-Null`;
+    const script = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Focus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int n); [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); }'; $p = Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if (-not $p) { exit 1 }; if ([Focus]::IsIconic($p.MainWindowHandle)) { [Focus]::ShowWindowAsync($p.MainWindowHandle, 9) | Out-Null }; [Focus]::SetForegroundWindow($p.MainWindowHandle) | Out-Null`;
     await execFileAsync2("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], {
       timeout: 5e3,
       windowsHide: true

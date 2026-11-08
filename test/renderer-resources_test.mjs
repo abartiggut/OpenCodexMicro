@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 import vm from "node:vm";
 import { CodexCdpClient } from "../src/bridge/codex-cdp.mjs";
@@ -82,6 +83,36 @@ test("CDP commands retain resource trees while Runtime.evaluate unwraps values",
   };
   assert.deepEqual(await client.sendCommand("Page.getResourceTree", {}), { frameTree: frames });
   assert.equal(await client.evaluate("false"), false);
+});
+
+test("Bridge reconnect discovers already loaded Micro scripts", async () => {
+  const client = new CodexCdpClient();
+  const socket = new EventEmitter();
+  const key = Symbol.for("codex-keyboard-renderer-resource-urls");
+  const context = { Symbol, Set, [key]: ["app://-/assets/app-shared-old.js"] };
+  const calls = [];
+  client.socket = socket;
+  client.sendCommand = async (method) => {
+    calls.push(method);
+    if (method === "Page.getResourceTree") return {
+      frameTree: { resources: [{ type: "Script", url: "app://-/assets/index.js" }] }
+    };
+    if (method === "Debugger.enable") {
+      socket.emit("message", JSON.stringify({ method: "Debugger.scriptParsed", params: {
+        url: "app://-/assets/codex-micro-slot-signals-hash.js"
+      } }));
+    }
+    return {};
+  };
+  client.evaluate = async (expression) => vm.runInNewContext(expression, context);
+  await client.refreshRendererResources();
+  assert.deepEqual(calls, ["Page.getResourceTree", "Debugger.enable", "Debugger.disable"]);
+  assert.deepEqual([...context[key]], [
+    "app://-/assets/app-shared-old.js",
+    "app://-/assets/index.js",
+    "app://-/assets/codex-micro-slot-signals-hash.js"
+  ]);
+  assert.equal(socket.listenerCount("message"), 0);
 });
 
 test("missing module discovery refreshes CDP resources and retries only the snapshot", async () => {

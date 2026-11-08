@@ -5,13 +5,14 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 
 const packageRootUrl = new URL("..", import.meta.url);
+const packageVersion = JSON.parse(await readFile(new URL("package.json", packageRootUrl))).version;
 const manifest = JSON.parse(await readFile(new URL("manifest.json", packageRootUrl)));
 const navigateAction = manifest.Actions.find(action =>
   action.UUID === "com.ulanzi.ulanzistudio.codexmicro.navigate"
 );
 assert.deepEqual(navigateAction?.Controllers, ["Encoder"]);
 assert.equal(navigateAction?.Encoder?.layout, "layouts/navigate-encoder.json");
-assert.equal(manifest.Version, "0.5.1");
+assert.equal(manifest.Version, packageVersion);
 assert.equal(manifest.Software?.MinVersion, "3.0.1");
 assert.equal(manifest.OS?.find(item => item.Platform === "mac")?.MinimumVersion, "13.0");
 assert.equal(manifest.OS?.find(item => item.Platform === "windows")?.MinimumVersion, "10");
@@ -179,7 +180,7 @@ try {
   );
   assert.equal(setupStatus?.payload?.status?.serviceOnline, true);
   assert.equal(setupStatus?.payload?.status?.cdpConnected, true);
-  assert.equal(setupStatus?.payload?.status?.bundledVersion, "0.5.1");
+  assert.equal(setupStatus?.payload?.status?.bundledVersion, packageVersion);
 
   const launchEvent = {
     uuid: "com.ulanzi.ulanzistudio.codexmicro.launch",

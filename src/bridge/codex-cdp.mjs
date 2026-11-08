@@ -453,8 +453,31 @@ export class CodexCdpClient {
     // Resource Timing can be cleared while imported modules remain loaded.
     const { frameTree } = await this.sendCommand("Page.getResourceTree", {});
     const urls = collectRendererScriptUrls(frameTree);
+    if (!urls.some((url) => url.includes("/assets/codex-micro-slot-signals-"))) {
+      const loaded = new Set();
+      const collect = (raw) => {
+        try {
+          const message = JSON.parse(String(raw));
+          if (message.method === "Debugger.scriptParsed" &&
+              message.params?.url?.startsWith("app://") &&
+              message.params.url.includes("/assets/") &&
+              message.params.url.endsWith(".js")) {
+            loaded.add(message.params.url);
+          }
+        } catch {}
+      };
+      this.socket.on("message", collect);
+      try {
+        await this.sendCommand("Debugger.enable", {});
+        urls.push(...loaded);
+      } finally {
+        await this.sendCommand("Debugger.disable", {}).catch(() => {});
+        this.socket?.off("message", collect);
+      }
+    }
     await this.evaluate(`(() => {
-      globalThis[Symbol.for("codex-keyboard-renderer-resource-urls")] = ${JSON.stringify(urls)};
+      const key = Symbol.for("codex-keyboard-renderer-resource-urls");
+      globalThis[key] = [...new Set([...(globalThis[key] ?? []), ...${JSON.stringify(urls)}])];
       return true;
     })()`);
   }

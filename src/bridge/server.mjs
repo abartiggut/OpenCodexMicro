@@ -26,7 +26,7 @@ let composerRevision = 0;
 
 async function focusCodex() {
   if (process.platform === "win32") {
-    const script = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Focus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int n); }'; $p = Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if (-not $p) { exit 1 }; [Focus]::ShowWindowAsync($p.MainWindowHandle, 9) | Out-Null; [Focus]::SetForegroundWindow($p.MainWindowHandle) | Out-Null`;
+    const script = `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Focus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int n); [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); }'; $p = Get-Process ChatGPT -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if (-not $p) { exit 1 }; if ([Focus]::IsIconic($p.MainWindowHandle)) { [Focus]::ShowWindowAsync($p.MainWindowHandle, 9) | Out-Null }; [Focus]::SetForegroundWindow($p.MainWindowHandle) | Out-Null`;
     await execFileAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], {
       timeout: 5000,
       windowsHide: true

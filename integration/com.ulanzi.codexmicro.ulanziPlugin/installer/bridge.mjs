@@ -3824,7 +3824,39 @@ function rendererResourceUrls() {
     }
   });
 }
-async function resolveMicroBus({ cachedBus, urls, importNamespace }) {
+async function resolveRspackRuntime({ urls, importNamespace }) {
+  const cached2 = globalThis[Symbol.for("codex-keyboard-rspack-runtime")];
+  if (typeof cached2 === "function" && cached2.m && cached2.c) return cached2;
+  for (const url of urls.filter((candidate) => candidate.startsWith("app://") && candidate.includes("/assets/") && !candidate.includes("/async/")).slice(0, 20)) {
+    try {
+      const candidate = (await importNamespace(url)).__webpack_require__;
+      if (typeof candidate === "function" && candidate.m && candidate.c) {
+        globalThis[Symbol.for("codex-keyboard-rspack-runtime")] = candidate;
+        return candidate;
+      }
+    } catch {
+    }
+  }
+  return null;
+}
+function rspackSlotResolvers(runtime) {
+  if (!runtime?.c || !runtime?.m) return [];
+  const resolvers = [];
+  for (const [id, module] of Object.entries(runtime.c)) {
+    const source = runtime.m[id];
+    if (typeof source !== "function" || !source.toString().includes("slots")) continue;
+    try {
+      for (const candidate of Object.values(module.exports ?? {})) {
+        if (candidate && typeof candidate === "object" && typeof candidate.resolve === "function" && typeof candidate.createSubscriberAtom === "function") {
+          resolvers.push(candidate);
+        }
+      }
+    } catch {
+    }
+  }
+  return resolvers;
+}
+async function resolveMicroBus({ cachedBus, urls, importNamespace, rspackRuntime = null }) {
   const isBus = (candidate) => Boolean(
     candidate && typeof candidate === "object" && candidate.handlers instanceof Map && (typeof candidate.dispatchHostMessage === "function" || typeof candidate.dispatchMessage === "function")
   );
@@ -3837,11 +3869,21 @@ async function resolveMicroBus({ cachedBus, urls, importNamespace }) {
     } catch {
     }
   }
+  if (rspackRuntime?.c) {
+    for (const module of Object.values(rspackRuntime.c)) {
+      try {
+        const bus = Object.values(module.exports ?? {}).find(isBus);
+        if (bus) return bus;
+      } catch {
+      }
+    }
+  }
   return null;
 }
 function readSignalValue(node, resolver, contextMap) {
   const resolved = resolver.resolve(node, contextMap);
-  return node.store.get(resolved?.atom ?? resolved);
+  const value = node.store.get(resolved?.atom ?? resolved);
+  return Array.isArray(value) ? value : value?.slots;
 }
 
 // ../../src/bridge/composer-control.mjs
@@ -4371,11 +4413,14 @@ var ENABLE_EXPRESSION = `(async () => {
     client.$emt?.({ name: "values_updated", status: client.loadingStatus });
   }
   const urls = (${rendererResourceUrls.toString()})();
+  const resolveRspackRuntime = ${resolveRspackRuntime.toString()};
+  const rspackRuntime = await resolveRspackRuntime({ urls, importNamespace: (url) => import(url) });
   const resolveMicroBus = ${resolveMicroBus.toString()};
   const bus = await resolveMicroBus({
     cachedBus: globalThis[Symbol.for("codex-keyboard-micro-bus")],
     urls,
-    importNamespace: (url) => import(url)
+    importNamespace: (url) => import(url),
+    rspackRuntime
   });
   if (bus) {
     globalThis[Symbol.for("codex-keyboard-micro-bus")] = bus;
@@ -4424,13 +4469,20 @@ var SNAPSHOT_EXPRESSION = `(async () => {
   if (!found) {
     const urls = (${rendererResourceUrls.toString()})();
     const slotSignalsUrl = urls.find((url) => url.includes("/assets/codex-micro-slot-signals-"));
-    if (!slotSignalsUrl) throw new Error("Codex Micro slot signals are not loaded");
+    const resolveRspackRuntime = ${resolveRspackRuntime.toString()};
+    const rspackRuntime = slotSignalsUrl ? null : await resolveRspackRuntime({
+      urls, importNamespace: (url) => import(url)
+    });
+    if (!slotSignalsUrl && !rspackRuntime) {
+      throw new Error("Codex Micro slot signals are not loaded");
+    }
 
     const resolveMicroBus = ${resolveMicroBus.toString()};
     const bus = await resolveMicroBus({
       cachedBus: globalThis[Symbol.for("codex-keyboard-micro-bus")],
       urls,
-      importNamespace: (url) => import(url)
+      importNamespace: (url) => import(url),
+      rspackRuntime
     });
     if (bus) {
       globalThis[Symbol.for("codex-keyboard-micro-bus")] = bus;
@@ -4439,11 +4491,13 @@ var SNAPSHOT_EXPRESSION = `(async () => {
       }
     }
 
-    const signals = await import(slotSignalsUrl);
-    const resolvers = Object.values(signals).filter((candidate) =>
-      candidate && typeof candidate === "object" &&
-      typeof candidate.resolve === "function" && typeof candidate.createSubscriberAtom === "function"
-    );
+    const resolvers = slotSignalsUrl
+      ? Object.values(await import(slotSignalsUrl)).filter((candidate) =>
+        candidate && typeof candidate === "object" &&
+        typeof candidate.resolve === "function" && typeof candidate.createSubscriberAtom === "function"
+      )
+      : (${rspackSlotResolvers.toString()})(rspackRuntime);
+    if (!resolvers.length) throw new Error("Codex Micro slot signals are not loaded");
     let rootFiber = root[reactKey];
     while (rootFiber?.return) rootFiber = rootFiber.return;
     const queue = [rootFiber?.stateNode?.current ?? rootFiber];
@@ -4582,14 +4636,21 @@ async function fetchJson(url, timeout = 1200) {
   if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}`);
   return response.json();
 }
-async function discoverDebugPort() {
+async function discoverDebugTarget() {
   if (process.platform === "win32") {
     const port = Number(process.env.CODEX_CDP_PORT || 9222);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error("Invalid CODEX_CDP_PORT");
     }
-    await fetchJson(`http://127.0.0.1:${port}/json/version`, 500);
-    return port;
+    for (const host of ["127.0.0.1", "[::1]"]) {
+      try {
+        await fetchJson(`http://${host}:${port}/json/version`, 500);
+        const target = selectMainTarget(await fetchJson(`http://${host}:${port}/json/list`, 1200));
+        if (target?.webSocketDebuggerUrl) return target;
+      } catch {
+      }
+    }
+    throw new Error("Codex is not running with the local debug bridge");
   }
   const { stdout } = await execFileAsync("/bin/ps", ["-axo", "command="], { timeout: 4e3 });
   for (const line of stdout.split("\n")) {
@@ -4597,8 +4658,8 @@ async function discoverDebugPort() {
     const port = Number(line.match(/--remote-debugging-port(?:=|\s+)(\d+)/)?.[1]);
     if (!Number.isInteger(port)) continue;
     try {
-      await fetchJson(`http://127.0.0.1:${port}/json/version`, 500);
-      return port;
+      const target = selectMainTarget(await fetchJson(`http://127.0.0.1:${port}/json/list`, 1200));
+      if (target?.webSocketDebuggerUrl) return target;
     } catch {
     }
   }
@@ -4649,8 +4710,7 @@ var CodexCdpClient = class {
   }
   async connect() {
     if (this.socket?.readyState === wrapper_default.OPEN) return;
-    const port = await discoverDebugPort();
-    const target = selectMainTarget(await fetchJson(`http://127.0.0.1:${port}/json/list`));
+    const target = await discoverDebugTarget();
     if (!target?.webSocketDebuggerUrl) throw new Error("Codex main renderer was not found");
     const socket = new wrapper_default(target.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => {
@@ -4819,11 +4879,14 @@ var CodexCdpClient = class {
       let bus = globalThis[cacheKey];
       if (!isMicroBus(bus)) {
         const urls = (${rendererResourceUrls.toString()})();
+        const resolveRspackRuntime = ${resolveRspackRuntime.toString()};
+        const rspackRuntime = await resolveRspackRuntime({ urls, importNamespace: (url) => import(url) });
         const resolveMicroBus = ${resolveMicroBus.toString()};
         bus = await resolveMicroBus({
           cachedBus: null,
           urls,
-          importNamespace: (url) => import(url)
+          importNamespace: (url) => import(url),
+          rspackRuntime
         });
         if (isMicroBus(bus)) {
           globalThis[cacheKey] = bus;

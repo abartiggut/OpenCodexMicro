@@ -7,6 +7,8 @@ import {
   collectRendererScriptUrls,
   readSignalValue,
   rendererResourceUrls,
+  resolveRspackRuntime,
+  rspackSlotResolvers,
   resolveMicroBus
 } from "../src/bridge/renderer-resources.mjs";
 
@@ -59,11 +61,32 @@ test("signal reads support both direct atoms and wrapped atom resolutions", () =
   const slots = Array.from({ length: 6 }, (_, id) => ({ id }));
   const atom = { read() { return slots; } };
   const node = { store: { get(value) {
-    assert.equal(value, atom);
+    assert.equal(typeof value.read, "function");
     return value.read();
   } } };
   assert.equal(readSignalValue(node, { resolve: () => atom }, new Map()), slots);
   assert.equal(readSignalValue(node, { resolve: () => ({ atom }) }, new Map()), slots);
+  const wrapped = { read() { return { slots }; } };
+  assert.equal(readSignalValue(node, { resolve: () => wrapped }, new Map()), slots);
+});
+
+test("numbered Rspack bundles expose Micro slot signals and the event bus", async () => {
+  const slots = Array.from({ length: 6 }, (_, id) => ({ id }));
+  const signal = { resolve: () => ({ atom: { read: () => slots } }), createSubscriberAtom() {} };
+  const bus = { handlers: new Map(), dispatchMessage() {} };
+  const runtime = Object.assign(() => {}, {
+    m: { slots: function slotsModule() { return { slots: true }; }, other: function otherModule() {} },
+    c: { slots: { exports: { f: signal } }, other: { exports: { bus } } }
+  });
+  const context = { Symbol, URL, globalThis: null };
+  context.globalThis = context;
+  const discovered = await vm.runInNewContext(
+    `(${resolveRspackRuntime.toString()})({ urls: ["app://-/assets/async/chunk.js", "app://-/assets/runtime.js"], importNamespace: async (url) => url.includes("runtime") ? { __webpack_require__: runtime } : {} })`,
+    { ...context, runtime }
+  );
+  assert.equal(discovered, runtime);
+  assert.deepEqual(rspackSlotResolvers(runtime), [signal]);
+  assert.equal(await resolveMicroBus({ cachedBus: null, urls: [], importNamespace: async () => ({}), rspackRuntime: runtime }), bus);
 });
 
 test("CDP commands retain resource trees while Runtime.evaluate unwraps values", async () => {

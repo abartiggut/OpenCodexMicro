@@ -34,7 +34,43 @@ export function rendererResourceUrls() {
   });
 }
 
-export async function resolveMicroBus({ cachedBus, urls, importNamespace }) {
+export async function resolveRspackRuntime({ urls, importNamespace }) {
+  const cached = globalThis[Symbol.for("codex-keyboard-rspack-runtime")];
+  if (typeof cached === "function" && cached.m && cached.c) return cached;
+  for (const url of urls.filter((candidate) =>
+    candidate.startsWith("app://") && candidate.includes("/assets/") &&
+    !candidate.includes("/async/")).slice(0, 20)) {
+    try {
+      const candidate = (await importNamespace(url)).__webpack_require__;
+      if (typeof candidate === "function" && candidate.m && candidate.c) {
+        globalThis[Symbol.for("codex-keyboard-rspack-runtime")] = candidate;
+        return candidate;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+export function rspackSlotResolvers(runtime) {
+  if (!runtime?.c || !runtime?.m) return [];
+  const resolvers = [];
+  for (const [id, module] of Object.entries(runtime.c)) {
+    const source = runtime.m[id];
+    if (typeof source !== "function" || !source.toString().includes("slots")) continue;
+    try {
+      for (const candidate of Object.values(module.exports ?? {})) {
+        if (candidate && typeof candidate === "object" &&
+            typeof candidate.resolve === "function" &&
+            typeof candidate.createSubscriberAtom === "function") {
+          resolvers.push(candidate);
+        }
+      }
+    } catch {}
+  }
+  return resolvers;
+}
+
+export async function resolveMicroBus({ cachedBus, urls, importNamespace, rspackRuntime = null }) {
   const isBus = (candidate) => Boolean(
     candidate && typeof candidate === "object" &&
     candidate.handlers instanceof Map &&
@@ -51,10 +87,19 @@ export async function resolveMicroBus({ cachedBus, urls, importNamespace }) {
       if (bus) return bus;
     } catch {}
   }
+  if (rspackRuntime?.c) {
+    for (const module of Object.values(rspackRuntime.c)) {
+      try {
+        const bus = Object.values(module.exports ?? {}).find(isBus);
+        if (bus) return bus;
+      } catch {}
+    }
+  }
   return null;
 }
 
 export function readSignalValue(node, resolver, contextMap) {
   const resolved = resolver.resolve(node, contextMap);
-  return node.store.get(resolved?.atom ?? resolved);
+  const value = node.store.get(resolved?.atom ?? resolved);
+  return Array.isArray(value) ? value : value?.slots;
 }

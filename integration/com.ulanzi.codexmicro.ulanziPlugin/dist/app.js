@@ -3761,29 +3761,45 @@ async function selectWindowsNodeRuntime({
 }
 function windowsLauncher() {
   return `$ErrorActionPreference = 'Stop'
-$debugUrl = 'http://127.0.0.1:9222/json/list'
 function Test-CodexDebugEndpoint {
-  try {
-    $targets = @(Invoke-RestMethod -Uri $debugUrl -TimeoutSec 1)
-    if (-not ($targets | Where-Object { $_.type -eq 'page' -and $_.url -like 'app://*' })) { return $false }
-    $listeners = @(Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction Stop)
-    if (-not $listeners -or ($listeners | Where-Object { $_.LocalAddress -notin @('127.0.0.1', '::1') })) { return $false }
-    foreach ($listenerPid in @($listeners | Select-Object -ExpandProperty OwningProcess -Unique)) {
-      $owner = Get-CimInstance Win32_Process -Filter "ProcessId = $listenerPid"
-      if ($owner.ExecutablePath -notlike '*\\OpenAI.Codex_*\\app\\ChatGPT.exe') { return $false }
+  foreach ($address in @('127.0.0.1', '::1')) {
+    $hostPart = if ($address -eq '::1') { '[::1]' } else { $address }
+    try {
+      $targets = @(Invoke-RestMethod -Uri "http://\${hostPart}:9222/json/list" -TimeoutSec 1)
+      if (-not ($targets | Where-Object { $_.type -eq 'page' -and $_.url -like 'app://*' })) { continue }
+      $listeners = @(Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction Stop |
+        Where-Object { $_.LocalAddress -eq $address })
+      if (-not $listeners) { continue }
+      $owners = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique |
+        ForEach-Object { Get-CimInstance Win32_Process -Filter "ProcessId = $_" })
+      if ($owners -and -not ($owners | Where-Object { $_.ExecutablePath -notlike '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' })) {
+        return $true
+      }
+    } catch {
+      continue
     }
-    return $true
-  } catch { return $false }
+  }
+  return $false
 }
-if (Test-CodexDebugEndpoint) { exit 0 }
-
 $running = @(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" |
   Where-Object { $_.ExecutablePath -like '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' -and $_.CommandLine -notmatch '--type=' })
 if ($running) {
+  Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class CodexWindow { [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr handle, out uint processId); }'
+  $shell = New-Object -ComObject WScript.Shell
   foreach ($codexProcess in $running) {
     $window = Get-Process -Id $codexProcess.ProcessId -ErrorAction SilentlyContinue
-    if (-not $window -or -not $window.CloseMainWindow()) {
-      throw 'Codex is running without a closable window. Quit Codex manually, then press the Bridge key again.'
+    if ($window -and $window.MainWindowHandle -ne [IntPtr]::Zero -and
+        [CodexWindow]::IsWindowVisible($window.MainWindowHandle)) {
+      if (-not $shell.AppActivate([int]$codexProcess.ProcessId)) {
+        throw 'Codex could not be focused. Quit Codex manually, then press the Bridge key again.'
+      }
+      Start-Sleep -Milliseconds 200
+      $foregroundProcessId = [uint32]0
+      [CodexWindow]::GetWindowThreadProcessId([CodexWindow]::GetForegroundWindow(), [ref]$foregroundProcessId) | Out-Null
+      if ($foregroundProcessId -ne $codexProcess.ProcessId) {
+        throw 'Codex lost focus. Quit Codex manually, then press the Bridge key again.'
+      }
+      $shell.SendKeys('^q')
     }
   }
   for ($attempt = 0; $attempt -lt 100; $attempt++) {
@@ -3795,8 +3811,9 @@ if ($running) {
   if ($running) {
     foreach ($codexProcess in $running) {
       $window = Get-Process -Id $codexProcess.ProcessId -ErrorAction SilentlyContinue
-      if ($window -and $window.MainWindowHandle -ne [IntPtr]::Zero) {
-        throw 'Codex did not quit. Finish any open dialog, then press the Bridge key again.'
+      if ($window -and $window.MainWindowHandle -ne [IntPtr]::Zero -and
+          [CodexWindow]::IsWindowVisible($window.MainWindowHandle)) {
+        throw 'Codex did not quit after Ctrl+Q. Finish any open dialog, then press the Bridge key again.'
       }
       Stop-Process -Id $codexProcess.ProcessId -Force -ErrorAction Stop
     }

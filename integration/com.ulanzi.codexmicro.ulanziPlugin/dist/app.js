@@ -3784,22 +3784,14 @@ function Test-CodexDebugEndpoint {
 $running = @(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'" |
   Where-Object { $_.ExecutablePath -like '*\\OpenAI.Codex_*\\app\\ChatGPT.exe' -and $_.CommandLine -notmatch '--type=' })
 if ($running) {
-  Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class CodexWindow { [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr handle, out uint processId); }'
-  $shell = New-Object -ComObject WScript.Shell
+  Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class CodexWindow { [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle); }'
   foreach ($codexProcess in $running) {
     $window = Get-Process -Id $codexProcess.ProcessId -ErrorAction SilentlyContinue
     if ($window -and $window.MainWindowHandle -ne [IntPtr]::Zero -and
         [CodexWindow]::IsWindowVisible($window.MainWindowHandle)) {
-      if (-not $shell.AppActivate([int]$codexProcess.ProcessId)) {
-        throw 'Codex could not be focused. Quit Codex manually, then press the Bridge key again.'
+      if (-not $window.CloseMainWindow()) {
+        throw 'Codex did not accept the window close request. Quit Codex manually, then press the Bridge key again.'
       }
-      Start-Sleep -Milliseconds 200
-      $foregroundProcessId = [uint32]0
-      [CodexWindow]::GetWindowThreadProcessId([CodexWindow]::GetForegroundWindow(), [ref]$foregroundProcessId) | Out-Null
-      if ($foregroundProcessId -ne $codexProcess.ProcessId) {
-        throw 'Codex lost focus. Quit Codex manually, then press the Bridge key again.'
-      }
-      $shell.SendKeys('^q')
     }
   }
   for ($attempt = 0; $attempt -lt 100; $attempt++) {
@@ -3813,7 +3805,7 @@ if ($running) {
       $window = Get-Process -Id $codexProcess.ProcessId -ErrorAction SilentlyContinue
       if ($window -and $window.MainWindowHandle -ne [IntPtr]::Zero -and
           [CodexWindow]::IsWindowVisible($window.MainWindowHandle)) {
-        throw 'Codex did not quit after Ctrl+Q. Finish any open dialog, then press the Bridge key again.'
+        throw 'Codex did not close its window. Finish any open dialog, then press the Bridge key again.'
       }
       Stop-Process -Id $codexProcess.ProcessId -Force -ErrorAction Stop
     }
@@ -3831,11 +3823,14 @@ $package = Get-AppxPackage -Name OpenAI.Codex | Sort-Object Version -Descending 
 if (-not $package) { throw 'The Codex desktop app is not installed.' }
 $codex = Join-Path $package.InstallLocation 'app\\ChatGPT.exe'
 if (-not (Test-Path -LiteralPath $codex)) { throw "Codex executable is missing: $codex" }
-Start-Process -FilePath $codex -ArgumentList @(
-  '--remote-debugging-address=127.0.0.1',
-  '--remote-debugging-port=9222',
-  '--remote-allow-origins=http://127.0.0.1:9222'
-)
+$startInfo = New-Object System.Diagnostics.ProcessStartInfo
+$startInfo.FileName = $codex
+$startInfo.WorkingDirectory = Split-Path -Parent $codex
+$startInfo.Arguments = '--remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --remote-allow-origins=http://127.0.0.1:9222'
+$startInfo.UseShellExecute = $false
+if (-not [System.Diagnostics.Process]::Start($startInfo)) {
+  throw 'Codex could not be started with the local debug bridge.'
+}
 for ($attempt = 0; $attempt -lt 150; $attempt++) {
   Start-Sleep -Milliseconds 200
   try {

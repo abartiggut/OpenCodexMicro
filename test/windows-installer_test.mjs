@@ -41,19 +41,19 @@ test("Windows Bridge installs for the current user and relaunches Codex through 
     await access(join(home, "AppData", "Local", "OpenCodexMicro", "bridge.mjs"));
     const launcher = await readFile(installed.appPath, "utf8");
     assert.match(launcher, /Get-AppxPackage -Name OpenAI\.Codex/);
-    assert.match(launcher, /AppActivate\(\[int\]\$codexProcess\.ProcessId\)/);
-    assert.match(launcher, /SendKeys\('\^q'\)/);
+    assert.match(launcher, /\$window\.CloseMainWindow\(\)/);
+    assert.doesNotMatch(launcher, /SendKeys\('/);
     assert.match(launcher, /IsWindowVisible/);
-    assert.match(launcher, /GetWindowThreadProcessId/);
-    assert.match(launcher, /Codex did not quit/);
+    assert.match(launcher, /Codex did not close its window/);
     assert.match(launcher, /MainWindowHandle -ne \[IntPtr\]::Zero/);
     assert.match(launcher, /Stop-Process -Id \$codexProcess\.ProcessId -Force/);
     assert.match(launcher, /Codex remained in the tray/);
     assert.match(launcher, /--remote-debugging-address=127\.0\.0\.1/);
     assert.match(launcher, /foreach \(\$address in @\('127\.0\.0\.1', '::1'\)\)/);
     assert.match(launcher, /Where-Object \{ \$_\.LocalAddress -eq \$address \}/);
+    assert.match(launcher, /\$startInfo\.UseShellExecute = \$false/);
     assert.ok(launcher.indexOf("if (Test-CodexDebugEndpoint) { exit 0 }") >
-      launcher.indexOf("Start-Process -FilePath $codex"));
+      launcher.indexOf("[System.Diagnostics.Process]::Start($startInfo)"));
 
     await installer.launch();
     assert.ok(commands.some(([command]) => command === "powershell.exe"));
